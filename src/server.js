@@ -7,10 +7,11 @@ import { portalManagerPlugin } from './plugins/portal-manager.js';
 import { workflowPlugin } from './plugins/workflow.js';
 import { auditLogPlugin } from './plugins/audit-log.js';
 import { foundationSuitePlugins } from './plugins/foundation-suite.js';
+import { officialMatrixPlugins } from './plugins/official-matrix.js';
 
 export async function createApp() {
   const core = new PulCore();
-  const plugins = [accessControlPlugin, portalManagerPlugin, workflowPlugin, auditLogPlugin, ...foundationSuitePlugins];
+  const plugins = [accessControlPlugin, portalManagerPlugin, workflowPlugin, auditLogPlugin, ...foundationSuitePlugins, ...officialMatrixPlugins];
   for (const plugin of plugins) core.plugins.install(plugin);
   for (const plugin of plugins) await core.plugins.enable(plugin.name);
 

@@ -60,6 +60,8 @@ export class PluginManager {
       description: plugin.description ?? '',
       category: plugin.category ?? 'business',
       version: plugin.version ?? '0.0.0',
+      license: plugin.license ?? 'free',
+      upstreamTier: plugin.upstreamTier ?? 'community',
       status: this.#status.get(plugin.name),
       dependencies: plugin.dependencies ?? [],
       capabilities: plugin.capabilities ?? []
