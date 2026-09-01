@@ -8,10 +8,11 @@ import { workflowPlugin } from './plugins/workflow.js';
 import { auditLogPlugin } from './plugins/audit-log.js';
 import { foundationSuitePlugins } from './plugins/foundation-suite.js';
 import { officialMatrixPlugins } from './plugins/official-matrix.js';
+import { iotSuitePlugins } from './plugins/iot-suite.js';
 
 export async function createApp() {
   const core = new PulCore();
-  const plugins = [accessControlPlugin, portalManagerPlugin, workflowPlugin, auditLogPlugin, ...foundationSuitePlugins, ...officialMatrixPlugins];
+  const plugins = [accessControlPlugin, portalManagerPlugin, workflowPlugin, auditLogPlugin, ...foundationSuitePlugins, ...officialMatrixPlugins, ...iotSuitePlugins];
   for (const plugin of plugins) core.plugins.install(plugin);
   for (const plugin of plugins) await core.plugins.enable(plugin.name);
 
@@ -30,6 +31,17 @@ async function route(core, request, response) {
   const url = new URL(request.url, 'http://localhost');
   if (request.method === 'GET' && url.pathname === '/health') {
     return json(response, 200, { name: 'PulCore', status: 'ok', plugins: core.plugins.list() });
+  }
+  if (request.method === 'GET' && url.pathname === '/api/plugins') {
+    if (request.headers['x-user-role'] !== 'admin') return json(response, 403, { error: 'AccessDenied', message: 'Administrator role required' });
+    return json(response, 200, { data: core.plugins.list(), meta: { total: core.plugins.list().length } });
+  }
+  const pluginAction = url.pathname.match(/^\/api\/plugins\/([a-z][a-z0-9-]*):(enable|disable)$/);
+  if (request.method === 'POST' && pluginAction) {
+    if (request.headers['x-user-role'] !== 'admin') return json(response, 403, { error: 'AccessDenied', message: 'Administrator role required' });
+    const [, name, action] = pluginAction;
+    await core.plugins[action](name);
+    return json(response, 200, core.plugins.list().find((plugin) => plugin.name === name));
   }
 
   const metadataMatch = url.pathname.match(/^\/api\/models\/([a-z][a-z0-9_]*)$/);
