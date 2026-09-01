@@ -1,6 +1,6 @@
 'use client';
 
-import { Activity, AppWindow, Boxes, Braces, ChevronDown, CircleHelp, Database, GitBranch, KeyRound, LayoutDashboard, MoreHorizontal, PackageCheck, Play, Plus, Search, Settings, ShieldCheck, Sparkles, Workflow } from 'lucide-react';
+import { Activity, AppWindow, Boxes, Braces, Check, ChevronDown, CircleHelp, Code2, Database, GitBranch, KeyRound, LayoutDashboard, MoreHorizontal, PackageCheck, Play, Plus, Search, Settings, ShieldCheck, Sparkles, TableProperties, Trash2, Workflow, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 const navigation = [
@@ -25,13 +25,14 @@ export default function Home() {
   const [active, setActive] = useState('工作台');
   const [query, setQuery] = useState('');
   const [environment, setEnvironment] = useState('生产环境');
+  const [designerOpen, setDesignerOpen] = useState(false);
   const visibleModels = useMemo(() => models.filter((m) => `${m.name}${m.key}`.toLowerCase().includes(query.toLowerCase())), [query]);
 
   return <main className="app-shell">
     <aside className="sidebar">
       <div className="brand"><Logo /><div><strong>榫卯</strong><small>PulCore</small></div></div>
       <nav className="nav-list" aria-label="平台导航"><p>构建</p>
-        {navigation.map(([label, Icon]) => <button key={label} className={active === label ? 'nav-item active' : 'nav-item'} onClick={() => setActive(label)}><Icon size={18}/><span>{label}</span>{label === '插件中心' && <em>12</em>}</button>)}
+        {navigation.map(([label, Icon]) => <button key={label} className={active === label ? 'nav-item active' : 'nav-item'} onClick={() => { setActive(label); if (label === '数据模型') setDesignerOpen(true); }}><Icon size={18}/><span>{label}</span>{label === '插件中心' && <em>12</em>}</button>)}
       </nav>
       <div className="sidebar-footer">
         <button className="nav-item"><CircleHelp size={18}/><span>帮助文档</span></button>
@@ -72,13 +73,62 @@ export default function Home() {
         <section className="builder-banner">
           <div className="schema-visual"><span><Database size={16}/>Model</span><i/><span><Braces size={16}/>Schema</span><i/><span><AppWindow size={16}/>UI</span></div>
           <div className="banner-copy"><span><Sparkles size={14}/> 元数据驱动</span><h2>定义一次模型，生成完整业务能力</h2><p>自动生成数据表、REST API、页面区块与权限入口，让团队专注业务本身。</p></div>
-          <button className="secondary-button"><Play size={15} fill="currentColor"/>打开模型设计器</button>
+          <button className="secondary-button" onClick={() => setDesignerOpen(true)}><Play size={15} fill="currentColor"/>打开模型设计器</button>
         </section>
       </div>
     </section>
+    {designerOpen && <ModelDesigner onClose={() => setDesignerOpen(false)}/>} 
   </main>;
 }
 
 function Logo(){ return <div className="brand-mark" aria-hidden="true"><span/><span/></div>; }
 function PanelTitle({title,note,action}:{title:string;note:string;action?:string}){ return <div className="panel-heading"><div><h2>{title}</h2><p>{note}</p></div>{action && <button>{action}</button>}</div>; }
 function Stat({icon:Icon,label,value,note,tone}:{icon:typeof Database;label:string;value:string;note:string;tone:string}){ return <article className="stat-card"><span className={`stat-icon ${tone}`}><Icon size={19}/></span><div><p>{label}</p><strong>{value}</strong><small>{note}</small></div></article>; }
+
+type Field = { id: number; name: string; key: string; type: string; required: boolean };
+const initialFields: Field[] = [
+  { id: 1, name: '客户名称', key: 'name', type: '单行文本', required: true },
+  { id: 2, name: '客户级别', key: 'level', type: '单选', required: true },
+  { id: 3, name: '联系电话', key: 'phone', type: '手机号', required: false },
+];
+
+function ModelDesigner({ onClose }: { onClose: () => void }) {
+  const [fields, setFields] = useState(initialFields);
+  const [modelName, setModelName] = useState('客户档案');
+  const [modelKey, setModelKey] = useState('customer_profile');
+  const [preview, setPreview] = useState<'api' | 'schema'>('api');
+  const [saved, setSaved] = useState(false);
+  const addField = () => setFields((items) => [...items, { id: Date.now(), name: '新字段', key: `field_${items.length + 1}`, type: '单行文本', required: false }]);
+  const updateField = (id: number, patch: Partial<Field>) => setFields((items) => items.map((field) => field.id === id ? { ...field, ...patch } : field));
+  const removeField = (id: number) => setFields((items) => items.filter((field) => field.id !== id));
+
+  const apiPreview = `GET    /api/model-${modelKey}:list\nGET    /api/model-${modelKey}:get/:id\nPOST   /api/model-${modelKey}:create\nPUT    /api/model-${modelKey}:update/:id\nDELETE /api/model-${modelKey}:delete/:id`;
+  const schemaPreview = JSON.stringify({ name: modelKey, title: modelName, fields: Object.fromEntries(fields.map((f) => [f.key, { title: f.name, type: f.type, required: f.required }])) }, null, 2);
+
+  return <div className="designer-backdrop" role="dialog" aria-modal="true" aria-label="数据模型设计器">
+    <section className="designer">
+      <header className="designer-header"><div><span><Database size={15}/> DATA MODEL</span><h2>模型设计器</h2><p>定义字段后，PulCore 会同步生成数据表、API、表单和权限入口。</p></div><button onClick={onClose} aria-label="关闭设计器"><X size={20}/></button></header>
+      <div className="designer-body">
+        <div className="designer-form">
+          <div className="model-meta"><label>模型名称<input value={modelName} onChange={(e) => setModelName(e.target.value)}/></label><label>模型标识<input value={modelKey} onChange={(e) => setModelKey(e.target.value.replace(/[^a-z0-9_]/g, ''))}/></label></div>
+          <div className="fields-heading"><div><h3>字段定义</h3><p>{fields.length} 个业务字段 · 系统自动附加 ID 与时间戳</p></div><button onClick={addField}><Plus size={15}/>添加字段</button></div>
+          <div className="fields-table"><div className="field-row field-head"><span>显示名称</span><span>字段标识</span><span>类型</span><span>必填</span><span/></div>
+            {fields.map((field) => <div className="field-row" key={field.id}>
+              <input value={field.name} onChange={(e) => updateField(field.id, { name: e.target.value })}/>
+              <input value={field.key} onChange={(e) => updateField(field.id, { key: e.target.value.replace(/[^a-zA-Z0-9_]/g, '') })}/>
+              <select value={field.type} onChange={(e) => updateField(field.id, { type: e.target.value })}><option>单行文本</option><option>多行文本</option><option>整数</option><option>金额</option><option>日期时间</option><option>单选</option><option>手机号</option></select>
+              <button className={field.required ? 'required-toggle on' : 'required-toggle'} onClick={() => updateField(field.id, { required: !field.required })}>{field.required && <Check size={12}/>}</button>
+              <button className="delete-field" onClick={() => removeField(field.id)} aria-label={`删除${field.name}`}><Trash2 size={15}/></button>
+            </div>)}
+          </div>
+        </div>
+        <aside className="designer-preview">
+          <div className="preview-tabs"><button className={preview === 'api' ? 'active' : ''} onClick={() => setPreview('api')}><Code2 size={14}/>动态 API</button><button className={preview === 'schema' ? 'active' : ''} onClick={() => setPreview('schema')}><TableProperties size={14}/>Model Schema</button></div>
+          <div className="preview-card"><div><i/><span>{preview === 'api' ? '自动生成的接口' : '实时元数据'}</span></div><pre>{preview === 'api' ? apiPreview : schemaPreview}</pre></div>
+          <div className="generated-list"><p>保存模型后自动生成</p>{['数据库物理表', 'RESTful CRUD API', '列表与表单页面', '字段级权限入口'].map((item) => <span key={item}><Check size={13}/>{item}</span>)}</div>
+        </aside>
+      </div>
+      <footer className="designer-footer"><span>{saved ? <><Check size={14}/>模型草稿已保存</> : '所有变更仅保存在当前原型中'}</span><div><button onClick={onClose}>取消</button><button className="save-model" onClick={() => setSaved(true)}>{saved ? '已保存' : '保存模型'}</button></div></footer>
+    </section>
+  </div>;
+}
