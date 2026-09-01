@@ -12,12 +12,14 @@ export class PulCore {
     this.models = new ModelRegistry();
     this.acl = new AclEngine();
     this.repository = new MemoryRepository();
+    this.contributions = new Map();
     this.plugins = new PluginManager(this);
     this.container
       .register('events', this.events)
       .register('models', this.models)
       .register('acl', this.acl)
       .register('repository', this.repository);
+    this.container.register('contributions', this.contributions);
   }
 
   registerModel(definition) {
@@ -77,4 +79,3 @@ function applySort(rows, sort, model) {
   if (!model.fields[field]) throw new Error(`Unknown sort field: ${field}`);
   return [...rows].sort((a, b) => String(a[field] ?? '').localeCompare(String(b[field] ?? '')) * (descending ? -1 : 1));
 }
-

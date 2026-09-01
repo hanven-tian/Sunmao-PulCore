@@ -2,7 +2,7 @@ function fields(extra) {
   return { name: { type: 'string', required: true, title: '名称' }, ...extra };
 }
 
-function iotPlugin({ name, title, description, capabilities, models = [], category = 'industrial-iot', dependencies = ['access-control', 'model-engine'] }) {
+function iotPlugin({ name, title, description, capabilities, models = [], category = 'industrial-iot', dependencies = ['access-control', 'data-source-main'] }) {
   return {
     name, title, description, category, version: '0.3.0', license: 'free',
     dependencies, capabilities,
@@ -72,7 +72,7 @@ export const edgeGatewayPlugin = iotPlugin({
 export const constructionEquipmentPlugin = iotPlugin({
   name:'construction-equipment-app',title:'施工设备管理示例',description:'由榫卯插件组合的公司—项目施工设备全生命周期应用',
   category:'example-app',
-  dependencies:['access-control','model-engine','workflow','file-manager','notification','dashboard-charts','multi-view','device-protocol-gateway','device-connection-manager','time-series-telemetry','device-alert-engine','edge-gateway-command'],
+    dependencies:['access-control','data-source-main','workflow','file-manager','notification-manager','block-chart','block-list','device-protocol-gateway','device-connection-manager','time-series-telemetry','device-alert-engine','edge-gateway-command'],
   capabilities:['equipment.ledger','equipment.maintenance','equipment.inventory','equipment.dispatch','equipment.map','equipment.analytics','equipment.mobile'],
   models:[
     {name:'construction_project',title:'施工项目',fields:fields({companyId:{type:'string',required:true,title:'公司'},code:{type:'string',required:true,title:'项目编码'},status:{type:'string',required:true,title:'状态'},location:{type:'json',title:'位置'}})},

@@ -6,15 +6,20 @@ import { accessControlPlugin } from './plugins/access-control.js';
 import { portalManagerPlugin } from './plugins/portal-manager.js';
 import { workflowPlugin } from './plugins/workflow.js';
 import { auditLogPlugin } from './plugins/audit-log.js';
-import { foundationSuitePlugins } from './plugins/foundation-suite.js';
-import { officialMatrixPlugins } from './plugins/official-matrix.js';
 import { iotSuitePlugins } from './plugins/iot-suite.js';
+import { createParityPlugins } from './plugins/parity-catalog.js';
 
 export async function createApp() {
   const core = new PulCore();
-  const plugins = [accessControlPlugin, portalManagerPlugin, workflowPlugin, auditLogPlugin, ...foundationSuitePlugins, ...officialMatrixPlugins, ...iotSuitePlugins];
+  const parityPlugins = createParityPlugins({
+    'access-control': accessControlPlugin,
+    'portal-manager': portalManagerPlugin,
+    workflow: workflowPlugin,
+    'audit-log': auditLogPlugin
+  });
+  const plugins = [...parityPlugins, ...iotSuitePlugins];
   for (const plugin of plugins) core.plugins.install(plugin);
-  for (const plugin of plugins) await core.plugins.enable(plugin.name);
+  for (const plugin of plugins) if (!plugin.requiresConfiguration) await core.plugins.enable(plugin.name);
 
   const server = http.createServer(async (request, response) => {
     try {
@@ -35,6 +40,15 @@ async function route(core, request, response) {
   if (request.method === 'GET' && url.pathname === '/api/plugins') {
     if (request.headers['x-user-role'] !== 'admin') return json(response, 403, { error: 'AccessDenied', message: 'Administrator role required' });
     return json(response, 200, { data: core.plugins.list(), meta: { total: core.plugins.list().length } });
+  }
+  const pluginDetail = url.pathname.match(/^\/api\/plugins\/([a-z][a-z0-9-]*)(?:\/(health))?$/);
+  if (request.method === 'GET' && pluginDetail) {
+    if (request.headers['x-user-role'] !== 'admin') return json(response, 403, { error: 'AccessDenied', message: 'Administrator role required' });
+    return json(response, 200, pluginDetail[2] ? await core.plugins.health(pluginDetail[1]) : core.plugins.get(pluginDetail[1]));
+  }
+  if (request.method === 'PUT' && pluginDetail && !pluginDetail[2]) {
+    if (request.headers['x-user-role'] !== 'admin') return json(response, 403, { error: 'AccessDenied', message: 'Administrator role required' });
+    return json(response, 200, core.plugins.configure(pluginDetail[1], await readJson(request)));
   }
   const pluginAction = url.pathname.match(/^\/api\/plugins\/([a-z][a-z0-9-]*):(enable|disable)$/);
   if (request.method === 'POST' && pluginAction) {
