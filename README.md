@@ -2,8 +2,6 @@
 
 PulCore 是一个面向企业级业务系统的元数据驱动微内核低代码平台。内核只提供插件、依赖注入、模型、动态 API、ACL 和事件能力，具体业务由插件组合完成。
 
-本仓库中的“设备台账”仅用于演示插件开发和动态业务链路，不属于 PulCore 内核，也不限定平台的业务方向。
-
 > 当前阶段：M0 可运行内核纵向切片。
 
 ## 已实现
@@ -15,7 +13,7 @@ PulCore 是一个面向企业级业务系统的元数据驱动微内核低代码
 - 模型级、操作级、行级、字段级 ACL
 - 支持前置/后置扩展的异步事件总线
 - 基于 Node.js HTTP 的动态 REST API
-- IoT 设备台账示例插件
+- 门户管理、用户权限、工作流和审计日志基础插件
 
 ## 快速开始
 
@@ -30,8 +28,8 @@ npm start
 
 ```bash
 curl http://127.0.0.1:3000/health
-curl -H 'x-user-role: admin' http://127.0.0.1:3000/api/models/device
-curl -H 'x-user-role: viewer' http://127.0.0.1:3000/api/model-device:list
+curl -H 'x-user-role: admin' http://127.0.0.1:3000/api/models/portal
+curl -H 'x-user-role: admin' http://127.0.0.1:3000/api/model-portal:list
 ```
 
 ## 动态 API

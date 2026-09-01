@@ -2,12 +2,16 @@ import http from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { PulCore } from './core/pulcore.js';
 import { AccessDeniedError } from './core/acl.js';
-import { deviceLedgerPlugin } from './plugins/device-ledger.js';
+import { accessControlPlugin } from './plugins/access-control.js';
+import { portalManagerPlugin } from './plugins/portal-manager.js';
+import { workflowPlugin } from './plugins/workflow.js';
+import { auditLogPlugin } from './plugins/audit-log.js';
 
 export async function createApp() {
   const core = new PulCore();
-  core.plugins.install(deviceLedgerPlugin);
-  await core.plugins.enable(deviceLedgerPlugin.name);
+  const plugins = [accessControlPlugin, portalManagerPlugin, workflowPlugin, auditLogPlugin];
+  for (const plugin of plugins) core.plugins.install(plugin);
+  for (const plugin of plugins) await core.plugins.enable(plugin.name);
 
   const server = http.createServer(async (request, response) => {
     try {
@@ -74,4 +78,3 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const port = Number(process.env.PORT ?? 3000);
   server.listen(port, '127.0.0.1', () => console.log(`PulCore listening on http://127.0.0.1:${port}`));
 }
-

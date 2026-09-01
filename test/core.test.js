@@ -4,60 +4,14 @@ import { Container } from '../src/core/container.js';
 import { EventBus } from '../src/core/event-bus.js';
 import { PulCore } from '../src/core/pulcore.js';
 import { AccessDeniedError } from '../src/core/acl.js';
-import { deviceLedgerPlugin } from '../src/plugins/device-ledger.js';
+import { accessControlPlugin } from '../src/plugins/access-control.js';
+import { portalManagerPlugin } from '../src/plugins/portal-manager.js';
+import { workflowPlugin } from '../src/plugins/workflow.js';
+import { auditLogPlugin } from '../src/plugins/audit-log.js';
 
-test('container creates singleton services lazily', () => {
-  const container = new Container();
-  let calls = 0;
-  container.register('service', () => ({ call: ++calls }));
-  assert.equal(container.resolve('service'), container.resolve('service'));
-  assert.equal(calls, 1);
-});
-
-test('event bus respects listener priority', async () => {
-  const events = new EventBus();
-  const order = [];
-  events.on('test', () => order.push('low'));
-  events.on('test', () => order.push('high'), { priority: 10 });
-  await events.emit('test');
-  assert.deepEqual(order, ['high', 'low']);
-});
-
-test('dynamic model CRUD applies field ACL and emits events', async () => {
-  const core = new PulCore();
-  core.plugins.install(deviceLedgerPlugin);
-  await core.plugins.enable('device-ledger');
-  let listed = false;
-  core.events.on('device.list.after', () => { listed = true; });
-
-  const adminList = await core.execute({ role: 'admin', model: 'device', action: 'list' });
-  assert.equal(adminList.meta.total, 1);
-  assert.equal(adminList.data[0].secretKey, 'demo-secret');
-
-  const viewerList = await core.execute({ role: 'viewer', model: 'device', action: 'list' });
-  assert.equal(viewerList.data[0].secretKey, undefined);
-  assert.equal(viewerList.data[0].code, 'DEV-001');
-  assert.equal(listed, true);
-
-  await assert.rejects(
-    core.execute({ role: 'viewer', model: 'device', action: 'delete', id: adminList.data[0].id }),
-    AccessDeniedError
-  );
-});
-
-test('row ACL limits operator to owned devices', async () => {
-  const core = new PulCore();
-  core.plugins.install(deviceLedgerPlugin);
-  await core.plugins.enable('device-ledger');
-  core.repository.create('device', { code: 'DEV-002', name: '水泵', status: 'offline', ownerId: 'operator-2' });
-
-  const list = await core.execute({
-    role: 'operator',
-    user: { id: 'operator-1' },
-    model: 'device',
-    action: 'list'
-  });
-  assert.equal(list.meta.total, 1);
-  assert.equal(list.data[0].code, 'DEV-001');
-});
-
+async function createFoundation() { const core = new PulCore(); const plugins = [accessControlPlugin, portalManagerPlugin, workflowPlugin, auditLogPlugin]; for (const plugin of plugins) core.plugins.install(plugin); for (const plugin of plugins) await core.plugins.enable(plugin.name); return core; }
+test('container creates singleton services lazily', () => { const container = new Container(); let calls = 0; container.register('service', () => ({ call: ++calls })); assert.equal(container.resolve('service'), container.resolve('service')); assert.equal(calls, 1); });
+test('event bus respects listener priority', async () => { const events = new EventBus(); const order = []; events.on('test', () => order.push('low')); events.on('test', () => order.push('high'), { priority: 10 }); await events.emit('test'); assert.deepEqual(order, ['high', 'low']); });
+test('foundation plugins install models and resolve dependencies', async () => { const core = await createFoundation(); assert.deepEqual(core.plugins.list().map((item) => item.name), ['access-control', 'portal-manager', 'workflow', 'audit-log']); assert.deepEqual(core.models.list().map((item) => item.name), ['user', 'role', 'portal', 'workflow', 'audit_log']); assert.equal(core.plugins.list().every((item) => item.status === 'enabled'), true); });
+test('portal manager supports real CRUD through metadata', async () => { const core = await createFoundation(); const created = await core.execute({ role: 'admin', model: 'portal', action: 'create', input: { name: '客户门户', key: 'crm', mode: 'no-code', description: '客户业务入口', enabled: true } }); assert.equal(created.key, 'crm'); const list = await core.execute({ role: 'admin', model: 'portal', action: 'list' }); assert.equal(list.meta.total, 2); const updated = await core.execute({ role: 'admin', model: 'portal', action: 'update', id: created.id, input: { enabled: false } }); assert.equal(updated.enabled, false); });
+test('ACL blocks anonymous foundation access', async () => { const core = await createFoundation(); await assert.rejects(core.execute({ role: 'anonymous', model: 'portal', action: 'list' }), AccessDeniedError); });

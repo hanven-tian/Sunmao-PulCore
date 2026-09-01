@@ -1,11 +1,11 @@
 'use client';
 
-import { Activity, AppWindow, Boxes, Braces, Check, ChevronDown, CircleHelp, Code2, Database, GitBranch, KeyRound, LayoutDashboard, MoreHorizontal, PackageCheck, Play, Plus, Search, Settings, ShieldCheck, Sparkles, TableProperties, Trash2, Workflow, X } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { Activity, AppWindow, Boxes, Braces, Check, ChevronDown, CircleHelp, Code2, Database, GitBranch, HardDrive, KeyRound, LayoutDashboard, MoreHorizontal, PackageCheck, Play, Plug, Plus, Search, Settings, ShieldCheck, Sparkles, TableProperties, Trash2, UserCog, Workflow, X } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 
 const navigation = [
-  ['工作台', LayoutDashboard], ['数据模型', Database], ['页面设计', AppWindow],
-  ['工作流', Workflow], ['权限策略', ShieldCheck], ['插件中心', Boxes],
+  ['工作台', LayoutDashboard], ['门户管理', AppWindow], ['数据模型', Database], ['数据源', HardDrive],
+  ['用户与权限', UserCog], ['工作流', Workflow], ['插件管理', Plug],
 ] as const;
 
 const models = [
@@ -32,7 +32,7 @@ export default function Home() {
     <aside className="sidebar">
       <div className="brand"><Logo /><div><strong>榫卯</strong><small>PulCore</small></div></div>
       <nav className="nav-list" aria-label="平台导航"><p>构建</p>
-        {navigation.map(([label, Icon]) => <button key={label} className={active === label ? 'nav-item active' : 'nav-item'} onClick={() => { setActive(label); if (label === '数据模型') setDesignerOpen(true); }}><Icon size={18}/><span>{label}</span>{label === '插件中心' && <em>12</em>}</button>)}
+        {navigation.map(([label, Icon]) => <button key={label} className={active === label ? 'nav-item active' : 'nav-item'} onClick={() => { setActive(label); if (label === '数据模型') setDesignerOpen(true); }}><Icon size={18}/><span>{label}</span>{label === '插件管理' && <em>4</em>}</button>)}
       </nav>
       <div className="sidebar-footer">
         <button className="nav-item"><CircleHelp size={18}/><span>帮助文档</span></button>
@@ -50,7 +50,7 @@ export default function Home() {
 
       <div className="workspace">
         <div className="page-heading"><div><p>PULCORE CONSOLE</p><h1>{active}</h1><span>用模型、页面与插件，组合你的下一套业务系统。</span></div><button className="primary-button"><Plus size={17}/>新建应用</button></div>
-        <section className="stats-grid">
+        {active === '工作台' ? <><section className="stats-grid">
           <Stat icon={Database} label="数据模型" value="16" note="+2 本月" tone="cyan"/>
           <Stat icon={AppWindow} label="已发布页面" value="28" note="6 个草稿" tone="violet"/>
           <Stat icon={Workflow} label="运行中流程" value="9" note="今日 1,204 次" tone="amber"/>
@@ -74,7 +74,7 @@ export default function Home() {
           <div className="schema-visual"><span><Database size={16}/>Model</span><i/><span><Braces size={16}/>Schema</span><i/><span><AppWindow size={16}/>UI</span></div>
           <div className="banner-copy"><span><Sparkles size={14}/> 元数据驱动</span><h2>定义一次模型，生成完整业务能力</h2><p>自动生成数据表、REST API、页面区块与权限入口，让团队专注业务本身。</p></div>
           <button className="secondary-button" onClick={() => setDesignerOpen(true)}><Play size={15} fill="currentColor"/>打开模型设计器</button>
-        </section>
+        </section></> : <FoundationModule active={active} openDesigner={() => setDesignerOpen(true)}/>}
       </div>
     </section>
     {designerOpen && <ModelDesigner onClose={() => setDesignerOpen(false)}/>} 
@@ -84,6 +84,61 @@ export default function Home() {
 function Logo(){ return <div className="brand-mark" aria-hidden="true"><span/><span/></div>; }
 function PanelTitle({title,note,action}:{title:string;note:string;action?:string}){ return <div className="panel-heading"><div><h2>{title}</h2><p>{note}</p></div>{action && <button>{action}</button>}</div>; }
 function Stat({icon:Icon,label,value,note,tone}:{icon:typeof Database;label:string;value:string;note:string;tone:string}){ return <article className="stat-card"><span className={`stat-icon ${tone}`}><Icon size={19}/></span><div><p>{label}</p><strong>{value}</strong><small>{note}</small></div></article>; }
+
+type ModuleRecord = { id: string; name: string; key: string; description: string; enabled: boolean; meta: string };
+const moduleSeed: Record<string, ModuleRecord[]> = {
+  '门户管理': [
+    { id: 'portal-admin', name: '管理工作台', key: '/admin', description: '平台配置与业务管理入口', enabled: true, meta: '无代码模式' },
+    { id: 'portal-team', name: '团队协作', key: '/team', description: '成员任务和协作信息门户', enabled: true, meta: '无代码模式' },
+  ],
+  '数据源': [
+    { id: 'source-main', name: '主数据库', key: 'primary', description: 'PulCore 默认业务数据源', enabled: true, meta: 'SQLite · 已连接' },
+    { id: 'source-analytics', name: '分析数据库', key: 'analytics', description: '用于报表与聚合查询', enabled: false, meta: 'PostgreSQL · 未连接' },
+  ],
+  '用户与权限': [
+    { id: 'user-admin', name: '平台管理员', key: 'admin', description: '管理平台配置与所有业务应用', enabled: true, meta: '管理员角色' },
+    { id: 'user-member', name: '普通成员', key: 'member', description: '访问已授权的门户和数据', enabled: true, meta: '成员角色' },
+  ],
+  '工作流': [
+    { id: 'flow-approval', name: '通用审批流程', key: 'approval', description: '提交、审批、退回和结束节点', enabled: true, meta: '记录事件触发' },
+    { id: 'flow-notify', name: '数据变更通知', key: 'change_notify', description: '模型数据变化后发送站内通知', enabled: false, meta: '事件总线触发' },
+  ],
+  '插件管理': [
+    { id: 'plugin-access', name: '用户与权限', key: 'access-control', description: '用户、角色和 ACL 权限策略', enabled: true, meta: '基础插件 · v0.1.0' },
+    { id: 'plugin-portal', name: '门户管理', key: 'portal-manager', description: '独立前端入口、路由和菜单', enabled: true, meta: '基础插件 · v0.1.0' },
+    { id: 'plugin-workflow', name: '工作流', key: 'workflow', description: '事件触发和流程节点执行', enabled: true, meta: '基础插件 · v0.1.0' },
+    { id: 'plugin-audit', name: '审计日志', key: 'audit-log', description: '记录平台配置和数据操作', enabled: true, meta: '基础插件 · v0.1.0' },
+  ],
+};
+
+function FoundationModule({ active, openDesigner }: { active: string; openDesigner: () => void }) {
+  const storageKey = `pulcore:${active}`;
+  const [records, setRecords] = useState<ModuleRecord[]>(moduleSeed[active] ?? []);
+  const [notice, setNotice] = useState('');
+  useEffect(() => { const saved = localStorage.getItem(storageKey); setRecords(saved ? JSON.parse(saved) : (moduleSeed[active] ?? [])); }, [storageKey, active]);
+  useEffect(() => { if (moduleSeed[active]) localStorage.setItem(storageKey, JSON.stringify(records)); }, [records, storageKey, active]);
+  if (active === '数据模型') return <section className="module-empty"><Database size={26}/><h2>模型设计器已就绪</h2><p>创建字段后自动生成数据表、API、页面和权限入口。</p><button onClick={openDesigner}>打开模型设计器</button></section>;
+
+  const addRecord = () => {
+    const index = records.length + 1;
+    const labels: Record<string, string> = { '门户管理': '新门户', '数据源': '新数据源', '用户与权限': '新角色', '工作流': '新工作流', '插件管理': '扩展插件' };
+    setRecords((items) => [...items, { id: `${active}-${Date.now()}`, name: `${labels[active] ?? '新项目'} ${index}`, key: `item_${index}`, description: '点击更多菜单继续配置', enabled: false, meta: '新建草稿' }]);
+    setNotice('已创建草稿，可继续启用和配置');
+  };
+  const toggle = (id: string) => { setRecords((items) => items.map((item) => item.id === id ? { ...item, enabled: !item.enabled } : item)); setNotice('状态已保存到当前浏览器'); };
+  const remove = (id: string) => { setRecords((items) => items.filter((item) => item.id !== id)); setNotice('项目已删除'); };
+
+  return <section className="foundation-module">
+    <div className="module-toolbar"><div><b>{records.filter((item) => item.enabled).length}</b><span> 个已启用 · 共 {records.length} 个项目</span></div><button onClick={addRecord}><Plus size={15}/>新增{active.replace('管理','')}</button></div>
+    {notice && <div className="module-notice"><Check size={14}/>{notice}<button onClick={() => setNotice('')}><X size={13}/></button></div>}
+    <div className="module-grid">{records.map((item) => <article className="module-card" key={item.id}>
+      <div className="module-card-top"><span className="module-symbol">{item.name.slice(0,1)}</span><button className={item.enabled ? 'switch on' : 'switch'} onClick={() => toggle(item.id)} aria-label={`${item.enabled ? '停用' : '启用'}${item.name}`}><i/></button></div>
+      <h3>{item.name}</h3><code>{item.key}</code><p>{item.description}</p>
+      <footer><span><i className={item.enabled ? 'online' : ''}/>{item.meta}</span><button onClick={() => remove(item.id)} aria-label={`删除${item.name}`}><Trash2 size={14}/></button></footer>
+    </article>)}</div>
+    {!records.length && <div className="module-empty"><Boxes size={26}/><h2>暂无项目</h2><p>创建第一个基础配置来开始使用。</p><button onClick={addRecord}>立即创建</button></div>}
+  </section>;
+}
 
 type Field = { id: number; name: string; key: string; type: string; required: boolean };
 const initialFields: Field[] = [
