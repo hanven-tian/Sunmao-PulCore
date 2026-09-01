@@ -1,5 +1,5 @@
 export const auditLogPlugin = {
-  name: 'audit-log', version: '0.1.0', dependencies: ['access-control'],
+  name: 'audit-log', title: '审计日志', description: '记录平台配置和数据操作', category: 'foundation', capabilities: ['audit.read', 'audit.record'], version: '0.1.0', dependencies: ['access-control'],
   install(core) {
     core.registerModel({ name: 'audit_log', title: '审计日志', fields: {
       event: { type: 'string', required: true, title: '事件' }, actor: { type: 'string', title: '操作者' }, resource: { type: 'string', title: '资源' }, detail: { type: 'json', title: '详情' }

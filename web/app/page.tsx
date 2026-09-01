@@ -32,7 +32,7 @@ export default function Home() {
     <aside className="sidebar">
       <div className="brand"><Logo /><div><strong>榫卯</strong><small>PulCore</small></div></div>
       <nav className="nav-list" aria-label="平台导航"><p>构建</p>
-        {navigation.map(([label, Icon]) => <button key={label} className={active === label ? 'nav-item active' : 'nav-item'} onClick={() => { setActive(label); if (label === '数据模型') setDesignerOpen(true); }}><Icon size={18}/><span>{label}</span>{label === '插件管理' && <em>4</em>}</button>)}
+        {navigation.map(([label, Icon]) => <button key={label} className={active === label ? 'nav-item active' : 'nav-item'} onClick={() => { setActive(label); if (label === '数据模型') setDesignerOpen(true); }}><Icon size={18}/><span>{label}</span>{label === '插件管理' && <em>10</em>}</button>)}
       </nav>
       <div className="sidebar-footer">
         <button className="nav-item"><CircleHelp size={18}/><span>帮助文档</span></button>
@@ -54,7 +54,7 @@ export default function Home() {
           <Stat icon={Database} label="数据模型" value="16" note="+2 本月" tone="cyan"/>
           <Stat icon={AppWindow} label="已发布页面" value="28" note="6 个草稿" tone="violet"/>
           <Stat icon={Workflow} label="运行中流程" value="9" note="今日 1,204 次" tone="amber"/>
-          <Stat icon={Boxes} label="已启用插件" value="12" note="全部正常" tone="green"/>
+          <Stat icon={Boxes} label="已启用插件" value="10" note="全部正常" tone="green"/>
         </section>
 
         <section className="main-grid">
@@ -108,6 +108,12 @@ const moduleSeed: Record<string, ModuleRecord[]> = {
     { id: 'plugin-portal', name: '门户管理', key: 'portal-manager', description: '独立前端入口、路由和菜单', enabled: true, meta: '基础插件 · v0.1.0' },
     { id: 'plugin-workflow', name: '工作流', key: 'workflow', description: '事件触发和流程节点执行', enabled: true, meta: '基础插件 · v0.1.0' },
     { id: 'plugin-audit', name: '审计日志', key: 'audit-log', description: '记录平台配置和数据操作', enabled: true, meta: '基础插件 · v0.1.0' },
+    { id: 'plugin-source', name: '数据源管理', key: 'data-source-manager', description: '统一管理数据库连接和可用状态', enabled: true, meta: '基础插件 · v0.1.0' },
+    { id: 'plugin-schema', name: '页面 Schema', key: 'ui-schema', description: '持久化页面、区块和交互配置', enabled: true, meta: '基础插件 · v0.1.0' },
+    { id: 'plugin-file', name: '文件管理', key: 'file-manager', description: '文件元数据、存储适配和访问控制', enabled: true, meta: '通用插件 · v0.1.0' },
+    { id: 'plugin-notify', name: '消息通知', key: 'notification', description: '站内信、邮件和 Webhook 通道', enabled: true, meta: '通用插件 · v0.1.0' },
+    { id: 'plugin-transfer', name: '导入导出', key: 'import-export', description: '模型数据批量导入、导出与任务追踪', enabled: true, meta: '通用插件 · v0.1.0' },
+    { id: 'plugin-schedule', name: '任务调度', key: 'scheduler', description: '定时任务、重试策略和执行记录', enabled: true, meta: '通用插件 · v0.1.0' },
   ],
 };
 
@@ -115,7 +121,14 @@ function FoundationModule({ active, openDesigner }: { active: string; openDesign
   const storageKey = `pulcore:${active}`;
   const [records, setRecords] = useState<ModuleRecord[]>(moduleSeed[active] ?? []);
   const [notice, setNotice] = useState('');
-  useEffect(() => { const saved = localStorage.getItem(storageKey); setRecords(saved ? JSON.parse(saved) : (moduleSeed[active] ?? [])); }, [storageKey, active]);
+  useEffect(() => {
+    const seed = moduleSeed[active] ?? [];
+    const saved = localStorage.getItem(storageKey);
+    if (!saved) return setRecords(seed);
+    const savedRecords = JSON.parse(saved) as ModuleRecord[];
+    const savedById = new Map(savedRecords.map((item) => [item.id, item]));
+    setRecords([...seed.map((item) => savedById.get(item.id) ?? item), ...savedRecords.filter((item) => !seed.some((seedItem) => seedItem.id === item.id))]);
+  }, [storageKey, active]);
   useEffect(() => { if (moduleSeed[active]) localStorage.setItem(storageKey, JSON.stringify(records)); }, [records, storageKey, active]);
   if (active === '数据模型') return <section className="module-empty"><Database size={26}/><h2>模型设计器已就绪</h2><p>创建字段后自动生成数据表、API、页面和权限入口。</p><button onClick={openDesigner}>打开模型设计器</button></section>;
 

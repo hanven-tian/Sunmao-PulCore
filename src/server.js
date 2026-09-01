@@ -6,10 +6,11 @@ import { accessControlPlugin } from './plugins/access-control.js';
 import { portalManagerPlugin } from './plugins/portal-manager.js';
 import { workflowPlugin } from './plugins/workflow.js';
 import { auditLogPlugin } from './plugins/audit-log.js';
+import { foundationSuitePlugins } from './plugins/foundation-suite.js';
 
 export async function createApp() {
   const core = new PulCore();
-  const plugins = [accessControlPlugin, portalManagerPlugin, workflowPlugin, auditLogPlugin];
+  const plugins = [accessControlPlugin, portalManagerPlugin, workflowPlugin, auditLogPlugin, ...foundationSuitePlugins];
   for (const plugin of plugins) core.plugins.install(plugin);
   for (const plugin of plugins) await core.plugins.enable(plugin.name);
 

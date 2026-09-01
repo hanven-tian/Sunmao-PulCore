@@ -22,9 +22,16 @@ export class PluginManager {
       if (!this.#plugins.has(dependency)) throw new Error(`Missing plugin dependency: ${name} -> ${dependency}`);
       await this.enable(dependency, [...trail, name]);
     }
-    await plugin.enable?.(this.context);
-    this.#status.set(name, 'enabled');
-    await this.context.events.emit('plugin.enabled', { name });
+    this.#status.set(name, 'enabling');
+    try {
+      await plugin.enable?.(this.context);
+      this.#status.set(name, 'enabled');
+      await this.context.events.emit('plugin.enabled', { name });
+    } catch (error) {
+      this.#status.set(name, 'failed');
+      await this.context.events.emit('plugin.failed', { name, error });
+      throw error;
+    }
   }
 
   async disable(name) {
@@ -49,9 +56,13 @@ export class PluginManager {
   list() {
     return [...this.#plugins.values()].map((plugin) => ({
       name: plugin.name,
+      title: plugin.title ?? plugin.name,
+      description: plugin.description ?? '',
+      category: plugin.category ?? 'business',
       version: plugin.version ?? '0.0.0',
       status: this.#status.get(plugin.name),
-      dependencies: plugin.dependencies ?? []
+      dependencies: plugin.dependencies ?? [],
+      capabilities: plugin.capabilities ?? []
     }));
   }
 
@@ -61,4 +72,3 @@ export class PluginManager {
     return plugin;
   }
 }
-

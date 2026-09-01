@@ -1,5 +1,5 @@
 export const accessControlPlugin = {
-  name: 'access-control', version: '0.1.0',
+  name: 'access-control', title: '用户与权限', description: '用户、角色和 ACL 权限策略', category: 'foundation', capabilities: ['user.manage', 'role.manage', 'acl.enforce'], version: '0.1.0',
   install(core) {
     core.registerModel({ name: 'user', title: '用户', fields: {
       username: { type: 'string', required: true, title: '用户名' }, displayName: { type: 'string', required: true, title: '显示名称' },
