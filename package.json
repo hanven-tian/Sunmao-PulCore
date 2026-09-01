@@ -1,0 +1,17 @@
+{
+  "name": "pulcore",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "PulCore 榫卯：元数据驱动的微内核低代码业务平台",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "test": "node --test",
+    "check": "node --check src/server.js && node --test"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
+
