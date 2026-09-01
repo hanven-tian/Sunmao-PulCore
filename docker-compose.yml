@@ -1,0 +1,21 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3000"
+    restart: unless-stopped
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3000
+  console:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy

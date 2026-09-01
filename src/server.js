@@ -77,5 +77,6 @@ function json(response, statusCode, body) {
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const { server } = await createApp();
   const port = Number(process.env.PORT ?? 3000);
-  server.listen(port, '127.0.0.1', () => console.log(`PulCore listening on http://127.0.0.1:${port}`));
+  const host = process.env.HOST ?? '127.0.0.1';
+  server.listen(port, host, () => console.log(`PulCore listening on http://${host}:${port}`));
 }

@@ -36,6 +36,20 @@ curl -H 'x-user-role: admin' http://127.0.0.1:3000/api/models/portal
 curl -H 'x-user-role: admin' http://127.0.0.1:3000/api/model-portal:list
 ```
 
+## Docker 容器化运行
+
+仓库同时提供控制台和微内核 API 的双服务编排：
+
+```bash
+docker compose up --build -d
+```
+
+- 控制台：`http://localhost:3000`
+- 微内核 API：`http://localhost:3001`
+- 健康检查：`http://localhost:3001/health`
+
+停止服务可运行 `docker compose down`。API 容器带健康检查，控制台会等待微内核服务就绪后启动。
+
 ## 动态 API
 
 - `GET /api/models/:model`：读取模型定义

@@ -1,0 +1,7 @@
+.git
+node_modules
+web/node_modules
+web/dist
+work
+outputs
+.DS_Store
