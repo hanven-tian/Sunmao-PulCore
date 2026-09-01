@@ -13,6 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://pulcore-console.chaitian2023.chatgpt.site'),
   title: '榫卯 PulCore · 低代码业务平台',
   description: '元数据驱动、微内核、插件化的企业级低代码业务平台。',
   openGraph: {
