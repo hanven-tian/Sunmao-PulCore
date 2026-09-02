@@ -21,7 +21,7 @@ jobs:
             context: .
             dockerfile: Dockerfile
           - component: console
-            context: ./web
+            context: .
             dockerfile: ./web/Dockerfile
     steps:
       - uses: actions/checkout@v4

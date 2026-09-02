@@ -14,8 +14,8 @@ services:
   console:
     image: ghcr.io/hanven-tian/sunmao-pulcore-console:${PULCORE_VERSION:-latest}
     build:
-      context: ./web
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: web/Dockerfile
     init: true
     ports:
       - "${PULCORE_CONSOLE_PORT:-3000}:3000"
