@@ -141,7 +141,24 @@ curl -H 'x-user-role: admin' http://127.0.0.1:3000/api/model-portal:list
 
 ## Docker 容器化运行
 
-仓库同时提供控制台和微内核 API 的双服务编排：
+仓库提供控制台和微内核 API 的双服务镜像，支持 `linux/amd64` 与 `linux/arm64`。每次推送主分支或版本标签后，GitHub Actions 会自动构建并发布到 GitHub Container Registry。
+
+### 直接运行已发布镜像
+
+下载 `docker-compose.yml` 后运行：
+
+```bash
+docker compose pull
+docker compose up -d --no-build
+docker compose ps
+```
+
+默认拉取：
+
+- `ghcr.io/hanven-tian/sunmao-pulcore-console:latest`
+- `ghcr.io/hanven-tian/sunmao-pulcore-api:latest`
+
+### 从源代码构建
 
 ```bash
 docker compose up --build -d
@@ -151,7 +168,22 @@ docker compose up --build -d
 - 微内核 API：`http://localhost:3001`
 - 健康检查：`http://localhost:3001/health`
 
-停止服务可运行 `docker compose down`。API 容器带健康检查，控制台会等待微内核服务就绪后启动。
+停止服务可运行 `docker compose down`。API 与控制台均带健康检查，控制台会等待微内核服务就绪后启动。
+
+如需修改镜像版本或端口：
+
+```bash
+cp .env.docker.example .env
+# 编辑 .env 后重新运行 docker compose up -d
+```
+
+访问地址：
+
+- 控制台：`http://localhost:3000`
+- 微内核 API：`http://localhost:3001`
+- API 健康检查：`http://localhost:3001/health`
+
+当前服务数据以内存与浏览器本地存储为主，容器重建不会形成生产数据库持久化。生产使用前应配置数据库、对象存储和备份适配器。
 
 ## 动态 API
 
