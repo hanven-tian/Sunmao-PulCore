@@ -1,38 +1,1626 @@
 'use client';
-import {ArrowLeft,Check,Database,Eye,FilePlus,KeyRound,LayoutTemplate,Plus,Save,ShieldCheck,Trash2,Workflow} from 'lucide-react';
-import {useEffect,useMemo,useState} from 'react';
-import {assemblyPlugins,AssemblyPlugin,ProjectAssembler,ProjectMeta} from './project-assembler';
+import {
+  ArrowLeft,
+  BarChart3,
+  CalendarDays,
+  Check,
+  Database,
+  Eye,
+  FilePlus,
+  KeyRound,
+  Kanban,
+  LayoutTemplate,
+  MapPinned,
+  Plus,
+  Save,
+  ShieldCheck,
+  Trash2,
+  Workflow,
+} from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  assemblyPlugins,
+  AssemblyPlugin,
+  ProjectAssembler,
+  ProjectMeta,
+} from './project-assembler';
 
-type FieldType='单行文本'|'多行文本'|'数字'|'日期'|'开关';
-type Field={id:string;name:string;key:string;type:FieldType;required:boolean};
-type Model={id:string;name:string;key:string;fields:Field[]};
-type Page={id:string;name:string;type:'列表页'|'表单页';modelId:string};
-type Role={id:string;name:string;create:boolean;read:boolean;update:boolean;remove:boolean};
-type RecordRow={id:string;[key:string]:unknown};
-type App={id:string;name:string;key:string;description:string;status:'草稿'|'已发布';template:string;mode:'ai'|'no-code';icon:string;cover:string;models:Model[];pages:Page[];roles:Role[];plugins:string[];records:Record<string,RecordRow[]>;workflow:{enabled:boolean;trigger:string;action:string};updated:string};
-const STORE='pulcore:applications',SELECTED='pulcore:selected-application';
-const fieldTypes:FieldType[]=['单行文本','多行文本','数字','日期','开关'];
-const now=()=>new Date().toLocaleString('zh-CN',{hour12:false});
-const id=(p:string)=>p+'-'+Date.now()+'-'+Math.random().toString(16).slice(2,7);
-function readApps():any[]{try{return JSON.parse(localStorage.getItem(STORE)||'[]')}catch{return []}}
-function normalize(raw:any):App{return {id:raw.id,name:raw.name,key:raw.key,description:raw.description||'',status:raw.status||'草稿',template:raw.template||'空白应用',mode:raw.mode||'no-code',icon:raw.icon||'layout',cover:raw.cover||'',models:(raw.models||[]).map((m:any)=>typeof m==='string'?{id:id('model'),name:m,key:m.toLowerCase(),fields:[]}:m),pages:(raw.pages||[]).map((p:any)=>typeof p==='string'?{id:id('page'),name:p,type:'列表页',modelId:''}:p),roles:(raw.roles||[]).map((r:any)=>typeof r==='string'?{id:id('role'),name:r,create:true,read:true,update:true,remove:true}:r),plugins:raw.plugins||['数据模型内核','页面 Schema','用户与权限'],records:raw.records||{},workflow:raw.workflow||{enabled:false,trigger:'记录创建',action:'站内通知'},updated:raw.updated||now()}}
-
-export function RealApplicationStudio({onBack,notify}:{onBack:()=>void;notify:(s:string)=>void}){
- const [app,setApp]=useState<App|null>(null),[setup,setSetup]=useState({name:'',key:'',description:''}),[tab,setTab]=useState('应用概览'),[selectedModel,setSelectedModel]=useState(''),[selectedPage,setSelectedPage]=useState(''),[preview,setPreview]=useState(false);
- useEffect(()=>{const selected=localStorage.getItem(SELECTED),raw=readApps().find(x=>x.id===selected);if(raw){const a=normalize(raw);setApp(a);setSelectedModel(a.models[0]?.id||'');setSelectedPage(a.pages[0]?.id||'')}},[]);
- const persist=(next:App,msg?:string)=>{const saved={...next,updated:now()},all=readApps();localStorage.setItem(STORE,JSON.stringify(all.some(x=>x.id===saved.id)?all.map(x=>x.id===saved.id?saved:x):[saved,...all]));setApp(saved);if(msg)notify(msg)};
- const create=(meta:ProjectMeta,selected:AssemblyPlugin[])=>{const has=(x:string)=>selected.some(p=>p.id===x),modelId=id('model');const fields:Field[]=[{id:id('field'),name:'名称',key:'name',type:'单行文本',required:true},{id:id('field'),name:'状态',key:'status',type:'单行文本',required:false},...(has('file')?[{id:id('field'),name:'附件',key:'attachment',type:'单行文本' as FieldType,required:false}]:[]),...(has('map')?[{id:id('field'),name:'位置',key:'location',type:'单行文本' as FieldType,required:false}]:[])];const models:Model[]=[{id:modelId,name:'业务记录',key:'business_record',fields},...(has('mqtt')?[{id:id('model'),name:'物联网设备',key:'iot_device',fields:[{id:id('field'),name:'设备名称',key:'name',type:'单行文本',required:true},{id:id('field'),name:'在线状态',key:'online',type:'开关',required:false},{id:id('field'),name:'最后心跳',key:'lastHeartbeat',type:'日期',required:false}]} as Model]:[])];const pages:Page[]=[...(has('table')?[{id:id('page'),name:'业务记录列表',type:'列表页' as const,modelId}]:[]),...(has('form')?[{id:id('page'),name:'业务录入',type:'表单页' as const,modelId}]:[])];const a:App={id:id('app'),name:meta.name.trim(),key:meta.key.trim()||'app-'+Date.now(),description:meta.description,status:'草稿',template:meta.mode==='ai'?'AI 代理生成':'插件装配项目',mode:meta.mode,icon:meta.icon,cover:meta.cover,models,pages,roles:[{id:id('role'),name:'管理员',create:true,read:true,update:true,remove:true},...(has('access')?[{id:id('role'),name:'业务成员',create:true,read:true,update:true,remove:false}]:[])],plugins:selected.map(x=>x.name),records:Object.fromEntries(models.map(x=>[x.id,[]])),workflow:{enabled:has('workflow'),trigger:'记录创建',action:has('approval')?'创建审批任务':has('notify')?'站内通知':'站内通知'},updated:now()};localStorage.setItem(SELECTED,a.id);persist(a,`${meta.mode==='ai'?'人工智能代理生成':'无代码装配'}：${selected.length} 个插件、${models.length} 个模型和 ${pages.length} 个页面`);setSelectedModel(models[0]?.id||'');setSelectedPage(pages[0]?.id||'')};
- if(!app)return <><button className="studio-back" onClick={onBack}><ArrowLeft size={14}/>返回应用中心</button><ProjectAssembler onCreate={create} notify={notify}/></>;
- const model=app.models.find(x=>x.id===selectedModel)||app.models[0];const page=app.pages.find(x=>x.id===selectedPage)||app.pages[0];
- return <section className="real-studio"><header><button className="studio-back" onClick={onBack}><ArrowLeft size={14}/>应用中心</button><div><small>{app.status} · {app.key}</small><h2>{app.name}</h2><p>{app.description||'未填写业务说明'}</p></div><div><button onClick={()=>persist(app,'草稿已保存')}><Save size={14}/>保存</button><button onClick={()=>setPreview(true)} disabled={!app.pages.length}><Eye size={14}/>运行预览</button></div></header><nav>{['应用概览','数据模型','数据管理','页面设计','角色权限','工作流','插件能力','发布'].map(x=><button key={x} className={tab===x?'active':''} onClick={()=>setTab(x)}>{x}</button>)}</nav><main>{tab==='应用概览'?<Overview app={app} go={setTab}/>:tab==='数据模型'?<ModelBuilder app={app} selected={model?.id||''} select={setSelectedModel} change={persist} notify={notify}/>:tab==='数据管理'?<DataManager app={app} model={model} select={setSelectedModel} change={persist} notify={notify}/>:tab==='页面设计'?<PageBuilder app={app} selected={page?.id||''} select={setSelectedPage} change={persist} notify={notify}/>:tab==='角色权限'?<RoleBuilder app={app} change={persist}/>:tab==='工作流'?<WorkflowBuilder app={app} change={persist}/>:tab==='插件能力'?<PluginSelector app={app} change={persist}/>:<Publish app={app} change={persist} preview={()=>setPreview(true)} notify={notify}/>}</main>{preview&&<Runtime app={app} role={app.roles[0]} initialPage={page} close={()=>setPreview(false)} change={persist} notify={notify}/>}</section>
+type FieldType = '单行文本' | '多行文本' | '数字' | '日期' | '开关';
+type Field = {
+  id: string;
+  name: string;
+  key: string;
+  type: FieldType;
+  required: boolean;
+};
+type Model = { id: string; name: string; key: string; fields: Field[] };
+type Page = {
+  id: string;
+  name: string;
+  type: '列表页' | '表单页' | '看板页' | '日历页' | '地图页' | '仪表盘';
+  modelId: string;
+};
+type Role = {
+  id: string;
+  name: string;
+  create: boolean;
+  read: boolean;
+  update: boolean;
+  remove: boolean;
+};
+type RecordRow = { id: string; [key: string]: unknown };
+type App = {
+  id: string;
+  name: string;
+  key: string;
+  description: string;
+  status: '草稿' | '已发布';
+  template: string;
+  mode: 'ai' | 'no-code';
+  icon: string;
+  cover: string;
+  models: Model[];
+  pages: Page[];
+  roles: Role[];
+  plugins: string[];
+  records: Record<string, RecordRow[]>;
+  workflow: { enabled: boolean; trigger: string; action: string };
+  updated: string;
+};
+const STORE = 'pulcore:applications',
+  SELECTED = 'pulcore:selected-application';
+const fieldTypes: FieldType[] = [
+  '单行文本',
+  '多行文本',
+  '数字',
+  '日期',
+  '开关',
+];
+const now = () => new Date().toLocaleString('zh-CN', { hour12: false });
+const id = (p: string) =>
+  p + '-' + Date.now() + '-' + Math.random().toString(16).slice(2, 7);
+const field = (
+  name: string,
+  key: string,
+  type: FieldType = '单行文本',
+  required = false,
+): Field => ({ id: id('field'), name, key, type, required });
+const model = (name: string, key: string, fields: Field[]): Model => ({
+  id: id('model'),
+  name,
+  key,
+  fields,
+});
+function generateDomainModels(
+  meta: ProjectMeta,
+  has: (id: string) => boolean,
+): Model[] {
+  const text = `${meta.name}${meta.description}`;
+  let models: Model[];
+  if (/合同|回款|客户/.test(text))
+    models = [
+      model('客户', 'customer', [
+        field('客户名称', 'name', '单行文本', true),
+        field('联系人', 'contact'),
+        field('联系电话', 'phone'),
+        field('客户级别', 'level'),
+        field('状态', 'status'),
+      ]),
+      model('合同', 'contract', [
+        field('合同名称', 'name', '单行文本', true),
+        field('合同编号', 'code', '单行文本', true),
+        field('客户', 'customer'),
+        field('合同金额', 'amount', '数字'),
+        field('签订日期', 'signedAt', '日期'),
+        field('到期日期', 'expiresAt', '日期'),
+        field('审批状态', 'status'),
+      ]),
+      model('回款计划', 'payment_plan', [
+        field('计划名称', 'name', '单行文本', true),
+        field('关联合同', 'contract'),
+        field('应收金额', 'amount', '数字'),
+        field('计划日期', 'dueAt', '日期'),
+        field('回款状态', 'status'),
+      ]),
+    ];
+  else if (/项目|任务|协作/.test(text))
+    models = [
+      model('项目', 'project', [
+        field('项目名称', 'name', '单行文本', true),
+        field('负责人', 'owner'),
+        field('开始日期', 'startAt', '日期'),
+        field('结束日期', 'endAt', '日期'),
+        field('状态', 'status'),
+      ]),
+      model('任务', 'task', [
+        field('任务名称', 'name', '单行文本', true),
+        field('所属项目', 'project'),
+        field('执行人', 'assignee'),
+        field('截止日期', 'dueAt', '日期'),
+        field('进度', 'progress', '数字'),
+        field('状态', 'status'),
+      ]),
+    ];
+  else if (/设备|物联网|巡检|维保/.test(text))
+    models = [
+      model('设备台账', 'equipment', [
+        field('设备名称', 'name', '单行文本', true),
+        field('设备编号', 'code', '单行文本', true),
+        field('设备类型', 'category'),
+        field('在线状态', 'online', '开关'),
+        field('安装位置', 'location'),
+        field('最后心跳', 'lastHeartbeat', '日期'),
+      ]),
+      model('维保工单', 'maintenance_order', [
+        field('工单名称', 'name', '单行文本', true),
+        field('关联设备', 'equipment'),
+        field('负责人', 'owner'),
+        field('计划日期', 'dueAt', '日期'),
+        field('状态', 'status'),
+      ]),
+    ];
+  else
+    models = [
+      model('业务记录', 'business_record', [
+        field('名称', 'name', '单行文本', true),
+        field('负责人', 'owner'),
+        field('日期', 'date', '日期'),
+        field('状态', 'status'),
+      ]),
+    ];
+  if (has('file'))
+    models.forEach((m) => m.fields.push(field('附件', 'attachment')));
+  if (has('map') && !models[0].fields.some((f) => f.key === 'location'))
+    models[0].fields.push(field('位置', 'location'));
+  return models;
 }
-function Overview({app,go}:{app:App;go:(x:string)=>void}){const checks=[[app.models.length>0,'至少创建一个模型','数据模型'],[app.models.some(x=>x.fields.length>0),'为模型定义字段','数据模型'],[Object.values(app.records).some(x=>x.length>0),'录入一条真实数据','数据管理'],[app.pages.length>0,'创建并绑定运行页面','页面设计'],[app.roles.length>0,'配置角色权限','角色权限']];return <><h3>应用可运行性检查</h3><p className="studio-muted">只有完成模型、字段、数据和页面绑定，应用才具备基础运行能力。</p><div className="studio-checks">{checks.map(([ok,label,target]:any)=><button key={label} onClick={()=>go(target)}><span className={ok?'done':''}>{ok?<Check size={14}/>:null}</span><b>{label}</b><em>{ok?'已完成':'去配置'}</em></button>)}</div></>}
-function ModelBuilder({app,selected,select,change,notify}:{app:App;selected:string;select:(x:string)=>void;change:(x:App,m?:string)=>void;notify:(x:string)=>void}){const [name,setName]=useState(''),[key,setKey]=useState(''),[field,setField]=useState({name:'',key:'',type:'单行文本' as FieldType,required:false});const model=app.models.find(x=>x.id===selected)||app.models[0];const addModel=()=>{if(!name.trim())return notify('模型名称不能为空');const m={id:id('model'),name:name.trim(),key:key.trim()||'model-'+Date.now(),fields:[]};change({...app,models:[...app.models,m],records:{...app.records,[m.id]:[]}},'模型已创建，可继续添加字段');select(m.id);setName('');setKey('')};const addField=()=>{if(!model||!field.name.trim()||!field.key.trim())return notify('字段名称和字段标识不能为空');if(model.fields.some(x=>x.key===field.key))return notify('字段标识不能重复');const f={...field,id:id('field')};change({...app,models:app.models.map(x=>x.id===model.id?{...x,fields:[...x.fields,f]}:x)},'字段结构已保存');setField({name:'',key:'',type:'单行文本',required:false})};return <div className="studio-split"><aside><h3>数据模型</h3>{app.models.map(x=><button className={model?.id===x.id?'active':''} onClick={()=>select(x.id)} key={x.id}><Database size={14}/><span><b>{x.name}</b><small>{x.fields.length} 个字段</small></span></button>)}<div className="studio-add-model"><input placeholder="模型名称" value={name} onChange={e=>setName(e.target.value)}/><input placeholder="模型标识" value={key} onChange={e=>setKey(e.target.value.replace(/[^a-zA-Z0-9-_]/g,''))}/><button onClick={addModel}><Plus size={13}/>创建模型</button></div></aside><article>{model?<><div className="studio-title"><div><h3>{model.name}</h3><p>标识：{model.key} · 字段结构决定表单与数据校验。</p></div><button className="danger" onClick={()=>{change({...app,models:app.models.filter(x=>x.id!==model.id),pages:app.pages.filter(x=>x.modelId!==model.id)},'模型及其绑定页面已删除');select('')}}><Trash2 size={13}/>删除模型</button></div><div className="field-create"><input placeholder="字段名称" value={field.name} onChange={e=>setField({...field,name:e.target.value})}/><input placeholder="字段标识" value={field.key} onChange={e=>setField({...field,key:e.target.value.replace(/[^a-zA-Z0-9-_]/g,'')})}/><select value={field.type} onChange={e=>setField({...field,type:e.target.value as FieldType})}>{fieldTypes.map(x=><option key={x}>{x}</option>)}</select><label><input type="checkbox" checked={field.required} onChange={e=>setField({...field,required:e.target.checked})}/>必填</label><button onClick={addField}><Plus size={13}/>添加字段</button></div><div className="field-list"><header><span>字段</span><span>标识</span><span>类型</span><span>校验</span><span>操作</span></header>{model.fields.map(f=><div key={f.id}><b>{f.name}</b><code>{f.key}</code><span>{f.type}</span><span>{f.required?'必填':'选填'}</span><button onClick={()=>change({...app,models:app.models.map(x=>x.id===model.id?{...x,fields:x.fields.filter(y=>y.id!==f.id)}:x)})}>删除</button></div>)}</div></>:<div className="studio-empty"><Database/><h3>先创建第一个数据模型</h3><p>例如客户、合同、订单或项目。</p></div>}</article></div>}
-function DataManager({app,model,select,change,notify}:{app:App;model?:Model;select:(x:string)=>void;change:(x:App,m?:string)=>void;notify:(x:string)=>void}){const [editing,setEditing]=useState<Record<string,unknown>>({});const rows=model?(app.records[model.id]||[]):[];const save=()=>{if(!model)return;const missing=model.fields.find(f=>f.required&&!String(editing[f.key]??'').trim());if(missing)return notify(`${missing.name}为必填字段`);if(!model.fields.length)return notify('请先为模型添加字段');change({...app,records:{...app.records,[model.id]:[...rows,{id:id('row'),...editing}]}},'数据已写入模型并可被页面读取');setEditing({})};return <><div className="studio-title"><div><h3>数据管理</h3><p>直接验证模型字段、必填规则和记录持久化。</p></div><select value={model?.id||''} onChange={e=>select(e.target.value)}>{app.models.map(x=><option value={x.id} key={x.id}>{x.name}</option>)}</select></div>{model?<><div className="record-form">{model.fields.map(f=><label key={f.id}>{f.name}{f.required&&<em>*</em>}{f.type==='开关'?<input type="checkbox" checked={Boolean(editing[f.key])} onChange={e=>setEditing({...editing,[f.key]:e.target.checked})}/>:f.type==='多行文本'?<textarea value={String(editing[f.key]??'')} onChange={e=>setEditing({...editing,[f.key]:e.target.value})}/>:<input type={f.type==='数字'?'number':f.type==='日期'?'date':'text'} value={String(editing[f.key]??'')} onChange={e=>setEditing({...editing,[f.key]:e.target.value})}/>}</label>)}<button onClick={save}><Plus size={14}/>保存记录</button></div><RecordTable model={model} rows={rows} remove={rid=>change({...app,records:{...app.records,[model.id]:rows.filter(x=>x.id!==rid)}},'记录已删除')}/></>:<div className="studio-empty">请先创建数据模型。</div>}</>}
-function RecordTable({model,rows,remove}:{model:Model;rows:RecordRow[];remove:(id:string)=>void}){return <div className="record-table"><header>{model.fields.map(f=><span key={f.id}>{f.name}</span>)}<span>操作</span></header>{rows.map(r=><div key={r.id}>{model.fields.map(f=><span key={f.id}>{f.type==='开关'?(r[f.key]?'是':'否'):String(r[f.key]??'—')}</span>)}<button onClick={()=>remove(r.id)}>删除</button></div>)}{!rows.length&&<p>暂无数据。填写上方表单并保存后将在这里出现。</p>}</div>}
-function PageBuilder({app,selected,select,change,notify}:{app:App;selected:string;select:(x:string)=>void;change:(x:App,m?:string)=>void;notify:(x:string)=>void}){const [form,setForm]=useState({name:'',type:'列表页' as '列表页'|'表单页',modelId:''});const add=()=>{if(!form.name||!form.modelId)return notify('页面名称和绑定模型必须填写');const p={...form,id:id('page')};change({...app,pages:[...app.pages,p]},'页面已生成并绑定模型');select(p.id);setForm({name:'',type:'列表页',modelId:''})};const page=app.pages.find(x=>x.id===selected)||app.pages[0],model=app.models.find(x=>x.id===page?.modelId);return <div className="studio-split"><aside><h3>运行页面</h3>{app.pages.map(x=><button className={page?.id===x.id?'active':''} key={x.id} onClick={()=>select(x.id)}><LayoutTemplate size={14}/><span><b>{x.name}</b><small>{x.type}</small></span></button>)}<div className="studio-add-model"><input placeholder="页面名称" value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/><select value={form.type} onChange={e=>setForm({...form,type:e.target.value as any})}><option>列表页</option><option>表单页</option></select><select value={form.modelId} onChange={e=>setForm({...form,modelId:e.target.value})}><option value="">选择绑定模型</option>{app.models.map(x=><option value={x.id} key={x.id}>{x.name}</option>)}</select><button onClick={add}><FilePlus size={13}/>生成页面</button></div></aside><article>{page&&model?<><div className="studio-title"><div><h3>{page.name}</h3><p>{page.type} · 绑定模型：{model.name} · {model.fields.length} 个字段</p></div><button className="danger" onClick={()=>change({...app,pages:app.pages.filter(x=>x.id!==page.id)},'页面已删除')}><Trash2 size={13}/>删除页面</button></div><div className="page-mock"><header>{page.name}<small>运行时页面预览</small></header><RecordTable model={model} rows={app.records[model.id]||[]} remove={()=>notify('设计预览中不删除数据，请在数据管理操作')}/></div></>:<div className="studio-empty"><LayoutTemplate/><h3>创建并绑定页面</h3><p>页面必须绑定一个已有数据模型。</p></div>}</article></div>}
-function RoleBuilder({app,change}:{app:App;change:(x:App,m?:string)=>void}){const [name,setName]=useState('');return <><div className="studio-title"><div><h3>角色与操作权限</h3><p>权限将在运行预览中直接控制新增与删除按钮。</p></div><div className="inline-add"><input value={name} onChange={e=>setName(e.target.value)} placeholder="新角色名称"/><button onClick={()=>{if(name){change({...app,roles:[...app.roles,{id:id('role'),name,create:false,read:true,update:false,remove:false}]},'角色已创建');setName('')}}}><Plus size={13}/>添加角色</button></div></div><div className="role-grid">{app.roles.map(r=><article key={r.id}><h4><KeyRound size={15}/>{r.name}</h4>{(['create','read','update','remove'] as const).map(k=><label key={k}><input type="checkbox" checked={r[k]} onChange={e=>change({...app,roles:app.roles.map(x=>x.id===r.id?{...x,[k]:e.target.checked}:x)})}/>{{create:'新增',read:'查看',update:'编辑',remove:'删除'}[k]}</label>)}</article>)}</div></>}
-function WorkflowBuilder({app,change}:{app:App;change:(x:App,m?:string)=>void}){return <><h3>工作流</h3><div className="workflow-config"><label><input type="checkbox" checked={app.workflow.enabled} onChange={e=>change({...app,workflow:{...app.workflow,enabled:e.target.checked}},e.target.checked?'工作流已启用':'工作流已停用')}/>启用自动流程</label><select value={app.workflow.trigger} onChange={e=>change({...app,workflow:{...app.workflow,trigger:e.target.value}})}><option>记录创建</option><option>记录更新</option><option>定时触发</option></select><Workflow/><span>触发后</span><select value={app.workflow.action} onChange={e=>change({...app,workflow:{...app.workflow,action:e.target.value}})}><option>站内通知</option><option>创建审批任务</option><option>调用 Webhook</option></select></div></>}
-function PluginSelector({app,change}:{app:App;change:(x:App,m?:string)=>void}){const [q,setQ]=useState('');const shown=assemblyPlugins.filter(x=>(x.name+x.description).includes(q));const installed=(p:AssemblyPlugin)=>app.plugins.includes(p.name);const add=(p:AssemblyPlugin)=>{const names=new Set(app.plugins);const visit=(x:AssemblyPlugin)=>{x.depends.forEach(d=>{const dep=assemblyPlugins.find(y=>y.id===d);if(dep)visit(dep)});names.add(x.name)};visit(p);change({...app,plugins:Array.from(names)},`${p.name}及依赖已装配`)};const remove=(p:AssemblyPlugin)=>{const dependents=assemblyPlugins.filter(x=>installed(x)&&x.depends.includes(p.id));if(dependents.length)return;change({...app,plugins:app.plugins.filter(x=>x!==p.name)},`${p.name}已从项目移除`)};return <><div className="studio-title"><div><h3>项目插件装配</h3><p>已装配 {app.plugins.length} 项。这里仅显示已经具备项目贡献逻辑的插件。</p></div><input value={q} onChange={e=>setQ(e.target.value)} placeholder="搜索可装配插件"/></div><div className="plugin-select-grid assembly-edit">{shown.map(p=><label key={p.id}><input type="checkbox" checked={installed(p)} onChange={e=>e.target.checked?add(p):remove(p)}/><span><b>{p.name}</b><small>{p.contributes.join(' · ')}</small></span></label>)}</div></>}
-function Publish({app,change,preview,notify}:{app:App;change:(x:App,m?:string)=>void;preview:()=>void;notify:(x:string)=>void}){const blockers=[!app.models.length&&'缺少数据模型',!app.models.some(x=>x.fields.length)&&'模型没有字段',!app.pages.length&&'缺少运行页面'].filter(Boolean);return <div className="publish-real"><ShieldCheck/><h3>发布前真实检查</h3>{blockers.length?<>{blockers.map(x=><p key={String(x)}>未通过：{x}</p>)}<button onClick={()=>notify('请先处理所有未通过项')}>当前不可发布</button></>:<><p>模型、字段、页面和权限结构已通过基础检查。</p><button onClick={preview}><Eye size={14}/>运行验证</button><button onClick={()=>change({...app,status:'已发布'},'应用已发布并保留全部配置与数据')}>确认发布</button></>}</div>}
-function Runtime({app,role:initialRole,initialPage,close,change,notify}:{app:App;role:Role;initialPage?:Page;close:()=>void;change:(x:App,m?:string)=>void;notify:(x:string)=>void}){const [roleId,setRoleId]=useState(initialRole.id),[pageId,setPageId]=useState(initialPage?.id||app.pages[0]?.id||''),[showForm,setShowForm]=useState(false),[values,setValues]=useState<Record<string,unknown>>({});const role=app.roles.find(x=>x.id===roleId)||initialRole,page=app.pages.find(x=>x.id===pageId),model=app.models.find(x=>x.id===page?.modelId),rows=model?(app.records[model.id]||[]):[];const save=()=>{if(!model)return;const missing=model.fields.find(f=>f.required&&!String(values[f.key]??'').trim());if(missing)return notify(`${missing.name}为必填字段`);change({...app,records:{...app.records,[model.id]:[...rows,{id:id('row'),...values}]}},'运行页面已新增记录');setValues({});setShowForm(false)};return <div className="runtime"><header><div><b>{app.name}</b><small>真实运行预览 · 当前数据会保存</small></div><select value={roleId} onChange={e=>setRoleId(e.target.value)}>{app.roles.map(x=><option value={x.id} key={x.id}>{x.name}</option>)}</select><button onClick={close}>退出预览</button></header><div><aside>{app.pages.map(x=><button className={x.id===pageId?'active':''} onClick={()=>setPageId(x.id)} key={x.id}>{x.name}</button>)}</aside><main>{page&&model?<><div className="runtime-title"><div><h2>{page.name}</h2><p>模型：{model.name} · 角色：{role.name}</p></div>{role.create&&<button onClick={()=>setShowForm(true)}><Plus size={14}/>新增记录</button>}</div>{role.read?<RecordTable model={model} rows={rows} remove={rid=>role.remove?change({...app,records:{...app.records,[model.id]:rows.filter(x=>x.id!==rid)}},'记录已删除'):notify('当前角色没有删除权限')}/>:<div className="studio-empty">当前角色没有查看权限。</div>}</>:<div className="studio-empty">页面未正确绑定模型。</div>}</main></div>{showForm&&model&&<div className="runtime-form"><article><h3>新增{model.name}</h3>{model.fields.map(f=><label key={f.id}>{f.name}{f.required&&'*'}<input type={f.type==='数字'?'number':f.type==='日期'?'date':'text'} value={String(values[f.key]??'')} onChange={e=>setValues({...values,[f.key]:e.target.value})}/></label>)}<footer><button onClick={()=>setShowForm(false)}>取消</button><button onClick={save}>保存记录</button></footer></article></div>}</div>}
+function generatePages(models: Model[], has: (id: string) => boolean): Page[] {
+  const pages: Page[] = [];
+  if (has('chart'))
+    pages.push({
+      id: id('page'),
+      name: '业务驾驶舱',
+      type: '仪表盘',
+      modelId: models[0].id,
+    });
+  for (const item of models) {
+    if (has('table'))
+      pages.push({
+        id: id('page'),
+        name: `${item.name}列表`,
+        type: '列表页',
+        modelId: item.id,
+      });
+    if (has('form'))
+      pages.push({
+        id: id('page'),
+        name: `${item.name}录入`,
+        type: '表单页',
+        modelId: item.id,
+      });
+  }
+  if (has('kanban'))
+    pages.push({
+      id: id('page'),
+      name: '状态看板',
+      type: '看板页',
+      modelId: models[0].id,
+    });
+  if (has('calendar'))
+    pages.push({
+      id: id('page'),
+      name: '业务日历',
+      type: '日历页',
+      modelId: models[0].id,
+    });
+  if (has('map'))
+    pages.push({
+      id: id('page'),
+      name: '位置地图',
+      type: '地图页',
+      modelId: models[0].id,
+    });
+  return pages.length
+    ? pages
+    : [
+        {
+          id: id('page'),
+          name: `${models[0].name}列表`,
+          type: '列表页',
+          modelId: models[0].id,
+        },
+      ];
+}
+function sampleRecords(item: Model): RecordRow[] {
+  return ['示例一', '示例二', '示例三'].map((name, index) => ({
+    id: id('row'),
+    ...Object.fromEntries(
+      item.fields.map((f) => [
+        f.key,
+        f.type === '数字'
+          ? (index + 1) * 10000
+          : f.type === '开关'
+            ? index !== 1
+            : f.type === '日期'
+              ? `2026-09-${String(index + 10).padStart(2, '0')}`
+              : f.key === 'status'
+                ? ['进行中', '待审批', '已完成'][index]
+                : f.key === 'name'
+                  ? `${item.name}${name}`
+                  : `${f.name}${index + 1}`,
+      ]),
+    ),
+  }));
+}
+function readApps(): any[] {
+  try {
+    return JSON.parse(localStorage.getItem(STORE) || '[]');
+  } catch {
+    return [];
+  }
+}
+function normalize(raw: any): App {
+  return {
+    id: raw.id,
+    name: raw.name,
+    key: raw.key,
+    description: raw.description || '',
+    status: raw.status || '草稿',
+    template: raw.template || '空白应用',
+    mode: raw.mode || 'no-code',
+    icon: raw.icon || 'layout',
+    cover: raw.cover || '',
+    models: (raw.models || []).map((m: any) =>
+      typeof m === 'string'
+        ? { id: id('model'), name: m, key: m.toLowerCase(), fields: [] }
+        : m,
+    ),
+    pages: (raw.pages || []).map((p: any) =>
+      typeof p === 'string'
+        ? { id: id('page'), name: p, type: '列表页', modelId: '' }
+        : p,
+    ),
+    roles: (raw.roles || []).map((r: any) =>
+      typeof r === 'string'
+        ? {
+            id: id('role'),
+            name: r,
+            create: true,
+            read: true,
+            update: true,
+            remove: true,
+          }
+        : r,
+    ),
+    plugins: raw.plugins || ['数据模型内核', '页面 Schema', '用户与权限'],
+    records: raw.records || {},
+    workflow: raw.workflow || {
+      enabled: false,
+      trigger: '记录创建',
+      action: '站内通知',
+    },
+    updated: raw.updated || now(),
+  };
+}
+
+export function RealApplicationStudio({
+  onBack,
+  notify,
+}: {
+  onBack: () => void;
+  notify: (s: string) => void;
+}) {
+  const [app, setApp] = useState<App | null>(null),
+    [setup, setSetup] = useState({ name: '', key: '', description: '' }),
+    [tab, setTab] = useState('应用概览'),
+    [selectedModel, setSelectedModel] = useState(''),
+    [selectedPage, setSelectedPage] = useState(''),
+    [preview, setPreview] = useState(false);
+  useEffect(() => {
+    const selected = localStorage.getItem(SELECTED),
+      raw = readApps().find((x) => x.id === selected);
+    if (raw) {
+      const a = normalize(raw);
+      setApp(a);
+      setSelectedModel(a.models[0]?.id || '');
+      setSelectedPage(a.pages[0]?.id || '');
+    }
+  }, []);
+  const persist = (next: App, msg?: string) => {
+    const saved = { ...next, updated: now() },
+      all = readApps();
+    localStorage.setItem(
+      STORE,
+      JSON.stringify(
+        all.some((x) => x.id === saved.id)
+          ? all.map((x) => (x.id === saved.id ? saved : x))
+          : [saved, ...all],
+      ),
+    );
+    setApp(saved);
+    if (msg) notify(msg);
+  };
+  const create = (meta: ProjectMeta, selected: AssemblyPlugin[]) => {
+    const has = (x: string) => selected.some((p) => p.id === x);
+    const models = generateDomainModels(meta, has);
+    const pages = generatePages(models, has);
+    const domainRoles = /合同|回款|客户/.test(`${meta.name}${meta.description}`)
+      ? ['销售人员', '财务人员', '审批人']
+      : /项目|任务|协作/.test(`${meta.name}${meta.description}`)
+        ? ['项目经理', '执行成员']
+        : /设备|物联网|巡检|维保/.test(`${meta.name}${meta.description}`)
+          ? ['设备管理员', '维保人员']
+          : ['业务成员'];
+    const a: App = {
+      id: id('app'),
+      name: meta.name.trim(),
+      key: meta.key.trim() || 'app-' + Date.now(),
+      description: meta.description,
+      status: '草稿',
+      template: meta.mode === 'ai' ? 'AI 代理生成' : '插件装配项目',
+      mode: meta.mode,
+      icon: meta.icon,
+      cover: meta.cover,
+      models,
+      pages,
+      roles: [
+        {
+          id: id('role'),
+          name: '管理员',
+          create: true,
+          read: true,
+          update: true,
+          remove: true,
+        },
+        ...(has('access')
+          ? domainRoles.map((name, index) => ({
+              id: id('role'),
+              name,
+              create: index < 2,
+              read: true,
+              update: index < 2,
+              remove: false,
+            }))
+          : []),
+      ],
+      plugins: selected.map((x) => x.name),
+      records: Object.fromEntries(models.map((x) => [x.id, sampleRecords(x)])),
+      workflow: {
+        enabled: has('workflow'),
+        trigger: '记录创建',
+        action: has('approval')
+          ? '创建审批任务'
+          : has('notify')
+            ? '站内通知'
+            : '站内通知',
+      },
+      updated: now(),
+    };
+    localStorage.setItem(SELECTED, a.id);
+    persist(
+      a,
+      `${meta.mode === 'ai' ? '人工智能代理生成' : '无代码装配'}：${selected.length} 个插件、${models.length} 个模型和 ${pages.length} 个页面`,
+    );
+    setSelectedModel(models[0]?.id || '');
+    setSelectedPage(pages[0]?.id || '');
+  };
+  if (!app)
+    return (
+      <>
+        <button className="studio-back" onClick={onBack}>
+          <ArrowLeft size={14} />
+          返回应用中心
+        </button>
+        <ProjectAssembler onCreate={create} notify={notify} />
+      </>
+    );
+  const model = app.models.find((x) => x.id === selectedModel) || app.models[0];
+  const page = app.pages.find((x) => x.id === selectedPage) || app.pages[0];
+  return (
+    <section className="real-studio">
+      <header>
+        <button className="studio-back" onClick={onBack}>
+          <ArrowLeft size={14} />
+          应用中心
+        </button>
+        <div>
+          <small>
+            {app.status} · {app.key}
+          </small>
+          <h2>{app.name}</h2>
+          <p>{app.description || '未填写业务说明'}</p>
+        </div>
+        <div>
+          <button onClick={() => persist(app, '草稿已保存')}>
+            <Save size={14} />
+            保存
+          </button>
+          <button onClick={() => setPreview(true)} disabled={!app.pages.length}>
+            <Eye size={14} />
+            运行预览
+          </button>
+        </div>
+      </header>
+      <nav>
+        {[
+          '应用概览',
+          '数据模型',
+          '数据管理',
+          '页面设计',
+          '角色权限',
+          '工作流',
+          '插件能力',
+          '发布',
+        ].map((x) => (
+          <button
+            key={x}
+            className={tab === x ? 'active' : ''}
+            onClick={() => setTab(x)}
+          >
+            {x}
+          </button>
+        ))}
+      </nav>
+      <main>
+        {tab === '应用概览' ? (
+          <Overview app={app} go={setTab} />
+        ) : tab === '数据模型' ? (
+          <ModelBuilder
+            app={app}
+            selected={model?.id || ''}
+            select={setSelectedModel}
+            change={persist}
+            notify={notify}
+          />
+        ) : tab === '数据管理' ? (
+          <DataManager
+            app={app}
+            model={model}
+            select={setSelectedModel}
+            change={persist}
+            notify={notify}
+          />
+        ) : tab === '页面设计' ? (
+          <PageBuilder
+            app={app}
+            selected={page?.id || ''}
+            select={setSelectedPage}
+            change={persist}
+            notify={notify}
+          />
+        ) : tab === '角色权限' ? (
+          <RoleBuilder app={app} change={persist} />
+        ) : tab === '工作流' ? (
+          <WorkflowBuilder app={app} change={persist} />
+        ) : tab === '插件能力' ? (
+          <PluginSelector app={app} change={persist} />
+        ) : (
+          <Publish
+            app={app}
+            change={persist}
+            preview={() => setPreview(true)}
+            notify={notify}
+          />
+        )}
+      </main>
+      {preview && (
+        <Runtime
+          app={app}
+          role={app.roles[0]}
+          initialPage={page}
+          close={() => setPreview(false)}
+          change={persist}
+          notify={notify}
+        />
+      )}
+    </section>
+  );
+}
+function Overview({ app, go }: { app: App; go: (x: string) => void }) {
+  const checks = [
+    [app.models.length > 0, '至少创建一个模型', '数据模型'],
+    [app.models.some((x) => x.fields.length > 0), '为模型定义字段', '数据模型'],
+    [
+      Object.values(app.records).some((x) => x.length > 0),
+      '录入一条真实数据',
+      '数据管理',
+    ],
+    [app.pages.length > 0, '创建并绑定运行页面', '页面设计'],
+    [app.roles.length > 0, '配置角色权限', '角色权限'],
+  ];
+  return (
+    <>
+      <h3>应用可运行性检查</h3>
+      <p className="studio-muted">
+        只有完成模型、字段、数据和页面绑定，应用才具备基础运行能力。
+      </p>
+      <div className="studio-checks">
+        {checks.map(([ok, label, target]: any) => (
+          <button key={label} onClick={() => go(target)}>
+            <span className={ok ? 'done' : ''}>
+              {ok ? <Check size={14} /> : null}
+            </span>
+            <b>{label}</b>
+            <em>{ok ? '已完成' : '去配置'}</em>
+          </button>
+        ))}
+      </div>
+    </>
+  );
+}
+function ModelBuilder({
+  app,
+  selected,
+  select,
+  change,
+  notify,
+}: {
+  app: App;
+  selected: string;
+  select: (x: string) => void;
+  change: (x: App, m?: string) => void;
+  notify: (x: string) => void;
+}) {
+  const [name, setName] = useState(''),
+    [key, setKey] = useState(''),
+    [field, setField] = useState({
+      name: '',
+      key: '',
+      type: '单行文本' as FieldType,
+      required: false,
+    });
+  const model = app.models.find((x) => x.id === selected) || app.models[0];
+  const addModel = () => {
+    if (!name.trim()) return notify('模型名称不能为空');
+    const m = {
+      id: id('model'),
+      name: name.trim(),
+      key: key.trim() || 'model-' + Date.now(),
+      fields: [],
+    };
+    change(
+      {
+        ...app,
+        models: [...app.models, m],
+        records: { ...app.records, [m.id]: [] },
+      },
+      '模型已创建，可继续添加字段',
+    );
+    select(m.id);
+    setName('');
+    setKey('');
+  };
+  const addField = () => {
+    if (!model || !field.name.trim() || !field.key.trim())
+      return notify('字段名称和字段标识不能为空');
+    if (model.fields.some((x) => x.key === field.key))
+      return notify('字段标识不能重复');
+    const f = { ...field, id: id('field') };
+    change(
+      {
+        ...app,
+        models: app.models.map((x) =>
+          x.id === model.id ? { ...x, fields: [...x.fields, f] } : x,
+        ),
+      },
+      '字段结构已保存',
+    );
+    setField({ name: '', key: '', type: '单行文本', required: false });
+  };
+  return (
+    <div className="studio-split">
+      <aside>
+        <h3>数据模型</h3>
+        {app.models.map((x) => (
+          <button
+            className={model?.id === x.id ? 'active' : ''}
+            onClick={() => select(x.id)}
+            key={x.id}
+          >
+            <Database size={14} />
+            <span>
+              <b>{x.name}</b>
+              <small>{x.fields.length} 个字段</small>
+            </span>
+          </button>
+        ))}
+        <div className="studio-add-model">
+          <input
+            placeholder="模型名称"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <input
+            placeholder="模型标识"
+            value={key}
+            onChange={(e) =>
+              setKey(e.target.value.replace(/[^a-zA-Z0-9-_]/g, ''))
+            }
+          />
+          <button onClick={addModel}>
+            <Plus size={13} />
+            创建模型
+          </button>
+        </div>
+      </aside>
+      <article>
+        {model ? (
+          <>
+            <div className="studio-title">
+              <div>
+                <h3>{model.name}</h3>
+                <p>标识：{model.key} · 字段结构决定表单与数据校验。</p>
+              </div>
+              <button
+                className="danger"
+                onClick={() => {
+                  change(
+                    {
+                      ...app,
+                      models: app.models.filter((x) => x.id !== model.id),
+                      pages: app.pages.filter((x) => x.modelId !== model.id),
+                    },
+                    '模型及其绑定页面已删除',
+                  );
+                  select('');
+                }}
+              >
+                <Trash2 size={13} />
+                删除模型
+              </button>
+            </div>
+            <div className="field-create">
+              <input
+                placeholder="字段名称"
+                value={field.name}
+                onChange={(e) => setField({ ...field, name: e.target.value })}
+              />
+              <input
+                placeholder="字段标识"
+                value={field.key}
+                onChange={(e) =>
+                  setField({
+                    ...field,
+                    key: e.target.value.replace(/[^a-zA-Z0-9-_]/g, ''),
+                  })
+                }
+              />
+              <select
+                value={field.type}
+                onChange={(e) =>
+                  setField({ ...field, type: e.target.value as FieldType })
+                }
+              >
+                {fieldTypes.map((x) => (
+                  <option key={x}>{x}</option>
+                ))}
+              </select>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={field.required}
+                  onChange={(e) =>
+                    setField({ ...field, required: e.target.checked })
+                  }
+                />
+                必填
+              </label>
+              <button onClick={addField}>
+                <Plus size={13} />
+                添加字段
+              </button>
+            </div>
+            <div className="field-list">
+              <header>
+                <span>字段</span>
+                <span>标识</span>
+                <span>类型</span>
+                <span>校验</span>
+                <span>操作</span>
+              </header>
+              {model.fields.map((f) => (
+                <div key={f.id}>
+                  <b>{f.name}</b>
+                  <code>{f.key}</code>
+                  <span>{f.type}</span>
+                  <span>{f.required ? '必填' : '选填'}</span>
+                  <button
+                    onClick={() =>
+                      change({
+                        ...app,
+                        models: app.models.map((x) =>
+                          x.id === model.id
+                            ? {
+                                ...x,
+                                fields: x.fields.filter((y) => y.id !== f.id),
+                              }
+                            : x,
+                        ),
+                      })
+                    }
+                  >
+                    删除
+                  </button>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="studio-empty">
+            <Database />
+            <h3>先创建第一个数据模型</h3>
+            <p>例如客户、合同、订单或项目。</p>
+          </div>
+        )}
+      </article>
+    </div>
+  );
+}
+function DataManager({
+  app,
+  model,
+  select,
+  change,
+  notify,
+}: {
+  app: App;
+  model?: Model;
+  select: (x: string) => void;
+  change: (x: App, m?: string) => void;
+  notify: (x: string) => void;
+}) {
+  const [editing, setEditing] = useState<Record<string, unknown>>({});
+  const rows = model ? app.records[model.id] || [] : [];
+  const save = () => {
+    if (!model) return;
+    const missing = model.fields.find(
+      (f) => f.required && !String(editing[f.key] ?? '').trim(),
+    );
+    if (missing) return notify(`${missing.name}为必填字段`);
+    if (!model.fields.length) return notify('请先为模型添加字段');
+    change(
+      {
+        ...app,
+        records: {
+          ...app.records,
+          [model.id]: [...rows, { id: id('row'), ...editing }],
+        },
+      },
+      '数据已写入模型并可被页面读取',
+    );
+    setEditing({});
+  };
+  return (
+    <>
+      <div className="studio-title">
+        <div>
+          <h3>数据管理</h3>
+          <p>直接验证模型字段、必填规则和记录持久化。</p>
+        </div>
+        <select
+          value={model?.id || ''}
+          onChange={(e) => select(e.target.value)}
+        >
+          {app.models.map((x) => (
+            <option value={x.id} key={x.id}>
+              {x.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      {model ? (
+        <>
+          <div className="record-form">
+            {model.fields.map((f) => (
+              <label key={f.id}>
+                {f.name}
+                {f.required && <em>*</em>}
+                {f.type === '开关' ? (
+                  <input
+                    type="checkbox"
+                    checked={Boolean(editing[f.key])}
+                    onChange={(e) =>
+                      setEditing({ ...editing, [f.key]: e.target.checked })
+                    }
+                  />
+                ) : f.type === '多行文本' ? (
+                  <textarea
+                    value={String(editing[f.key] ?? '')}
+                    onChange={(e) =>
+                      setEditing({ ...editing, [f.key]: e.target.value })
+                    }
+                  />
+                ) : (
+                  <input
+                    type={
+                      f.type === '数字'
+                        ? 'number'
+                        : f.type === '日期'
+                          ? 'date'
+                          : 'text'
+                    }
+                    value={String(editing[f.key] ?? '')}
+                    onChange={(e) =>
+                      setEditing({ ...editing, [f.key]: e.target.value })
+                    }
+                  />
+                )}
+              </label>
+            ))}
+            <button onClick={save}>
+              <Plus size={14} />
+              保存记录
+            </button>
+          </div>
+          <RecordTable
+            model={model}
+            rows={rows}
+            remove={(rid) =>
+              change(
+                {
+                  ...app,
+                  records: {
+                    ...app.records,
+                    [model.id]: rows.filter((x) => x.id !== rid),
+                  },
+                },
+                '记录已删除',
+              )
+            }
+          />
+        </>
+      ) : (
+        <div className="studio-empty">请先创建数据模型。</div>
+      )}
+    </>
+  );
+}
+function RecordTable({
+  model,
+  rows,
+  remove,
+}: {
+  model: Model;
+  rows: RecordRow[];
+  remove: (id: string) => void;
+}) {
+  return (
+    <div className="record-table">
+      <header>
+        {model.fields.map((f) => (
+          <span key={f.id}>{f.name}</span>
+        ))}
+        <span>操作</span>
+      </header>
+      {rows.map((r) => (
+        <div key={r.id}>
+          {model.fields.map((f) => (
+            <span key={f.id}>
+              {f.type === '开关'
+                ? r[f.key]
+                  ? '是'
+                  : '否'
+                : String(r[f.key] ?? '—')}
+            </span>
+          ))}
+          <button onClick={() => remove(r.id)}>删除</button>
+        </div>
+      ))}
+      {!rows.length && <p>暂无数据。填写上方表单并保存后将在这里出现。</p>}
+    </div>
+  );
+}
+function PageSurface({
+  page,
+  model,
+  rows,
+  add,
+  remove,
+}: {
+  page: Page;
+  model: Model;
+  rows: RecordRow[];
+  add?: () => void;
+  remove: (id: string) => void;
+}) {
+  if (page.type === '仪表盘')
+    return (
+      <div className="runtime-dashboard">
+        <section className="runtime-kpis">
+          <article>
+            <small>数据总量</small>
+            <b>{rows.length}</b>
+            <em>实时汇总</em>
+          </article>
+          <article>
+            <small>模型字段</small>
+            <b>{model.fields.length}</b>
+            <em>{model.name}</em>
+          </article>
+          <article>
+            <small>处理中</small>
+            <b>
+              {
+                rows.filter(
+                  (x) =>
+                    String(x.status).includes('中') ||
+                    String(x.status).includes('待'),
+                ).length
+              }
+            </b>
+            <em>需要跟进</em>
+          </article>
+        </section>
+        <section className="runtime-chart">
+          <header>
+            <BarChart3 size={16} />
+            业务趋势
+          </header>
+          <div>
+            {rows.map((row, index) => (
+              <span key={row.id} style={{ height: `${38 + index * 24}%` }}>
+                <i>{String(row.name || index + 1)}</i>
+              </span>
+            ))}
+          </div>
+        </section>
+        <RecordTable model={model} rows={rows} remove={remove} />
+      </div>
+    );
+  if (page.type === '看板页') {
+    const groups = ['待审批', '进行中', '已完成'];
+    return (
+      <div className="runtime-kanban">
+        {groups.map((status) => (
+          <section key={status}>
+            <header>
+              <Kanban size={14} />
+              {status}
+              <b>{rows.filter((x) => x.status === status).length}</b>
+            </header>
+            {rows
+              .filter((x) => x.status === status)
+              .map((row) => (
+                <article key={row.id}>
+                  <b>{String(row.name || model.name)}</b>
+                  <small>
+                    {model.fields
+                      .slice(1, 3)
+                      .map((f) => `${f.name}：${String(row[f.key] ?? '—')}`)
+                      .join(' · ')}
+                  </small>
+                </article>
+              ))}
+          </section>
+        ))}
+      </div>
+    );
+  }
+  if (page.type === '日历页')
+    return (
+      <div className="runtime-calendar">
+        <header>
+          <CalendarDays size={16} />
+          业务日历
+        </header>
+        {rows.map((row, index) => (
+          <article key={row.id}>
+            <strong>{String(index + 10).padStart(2, '0')}</strong>
+            <span>
+              <b>{String(row.name || model.name)}</b>
+              <small>
+                {String(
+                  Object.entries(row).find(([key]) =>
+                    /date|At/.test(key),
+                  )?.[1] || '待安排',
+                )}
+              </small>
+            </span>
+          </article>
+        ))}
+      </div>
+    );
+  if (page.type === '地图页')
+    return (
+      <div className="runtime-location">
+        <section>
+          <MapPinned size={30} />
+          <b>位置业务视图</b>
+          <p>位置字段已与 {model.name} 数据联动</p>
+        </section>
+        <div>
+          {rows.map((row, index) => (
+            <article key={row.id}>
+              <span>{index + 1}</span>
+              <b>{String(row.name || model.name)}</b>
+              <small>{String(row.location || `业务位置 ${index + 1}`)}</small>
+            </article>
+          ))}
+        </div>
+      </div>
+    );
+  if (page.type === '表单页')
+    return (
+      <div className="runtime-form-page">
+        <header>
+          <FilePlus size={18} />
+          <div>
+            <b>{model.name}录入</b>
+            <small>表单字段由数据模型自动生成</small>
+          </div>
+        </header>
+        <div>
+          {model.fields.map((f) => (
+            <label key={f.id}>
+              {f.name}
+              {f.required && <em>*</em>}
+              <input placeholder={`请输入${f.name}`} readOnly />
+            </label>
+          ))}
+        </div>
+        {add && (
+          <button onClick={add}>
+            <Plus size={14} />
+            填写并保存
+          </button>
+        )}
+      </div>
+    );
+  return <RecordTable model={model} rows={rows} remove={remove} />;
+}
+function PageBuilder({
+  app,
+  selected,
+  select,
+  change,
+  notify,
+}: {
+  app: App;
+  selected: string;
+  select: (x: string) => void;
+  change: (x: App, m?: string) => void;
+  notify: (x: string) => void;
+}) {
+  const [form, setForm] = useState({
+    name: '',
+    type: '列表页' as Page['type'],
+    modelId: '',
+  });
+  const add = () => {
+    if (!form.name || !form.modelId)
+      return notify('页面名称和绑定模型必须填写');
+    const p = { ...form, id: id('page') };
+    change({ ...app, pages: [...app.pages, p] }, '页面已生成并绑定模型');
+    select(p.id);
+    setForm({ name: '', type: '列表页', modelId: '' });
+  };
+  const page = app.pages.find((x) => x.id === selected) || app.pages[0],
+    model = app.models.find((x) => x.id === page?.modelId);
+  return (
+    <div className="studio-split">
+      <aside>
+        <h3>运行页面</h3>
+        {app.pages.map((x) => (
+          <button
+            className={page?.id === x.id ? 'active' : ''}
+            key={x.id}
+            onClick={() => select(x.id)}
+          >
+            <LayoutTemplate size={14} />
+            <span>
+              <b>{x.name}</b>
+              <small>{x.type}</small>
+            </span>
+          </button>
+        ))}
+        <div className="studio-add-model">
+          <input
+            placeholder="页面名称"
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+          />
+          <select
+            value={form.type}
+            onChange={(e) => setForm({ ...form, type: e.target.value as any })}
+          >
+            <option>列表页</option>
+            <option>表单页</option>
+            <option>看板页</option>
+            <option>日历页</option>
+            <option>地图页</option>
+            <option>仪表盘</option>
+          </select>
+          <select
+            value={form.modelId}
+            onChange={(e) => setForm({ ...form, modelId: e.target.value })}
+          >
+            <option value="">选择绑定模型</option>
+            {app.models.map((x) => (
+              <option value={x.id} key={x.id}>
+                {x.name}
+              </option>
+            ))}
+          </select>
+          <button onClick={add}>
+            <FilePlus size={13} />
+            生成页面
+          </button>
+        </div>
+      </aside>
+      <article>
+        {page && model ? (
+          <>
+            <div className="studio-title">
+              <div>
+                <h3>{page.name}</h3>
+                <p>
+                  {page.type} · 绑定模型：{model.name} · {model.fields.length}{' '}
+                  个字段
+                </p>
+              </div>
+              <button
+                className="danger"
+                onClick={() =>
+                  change(
+                    {
+                      ...app,
+                      pages: app.pages.filter((x) => x.id !== page.id),
+                    },
+                    '页面已删除',
+                  )
+                }
+              >
+                <Trash2 size={13} />
+                删除页面
+              </button>
+            </div>
+            <div className="page-mock">
+              <header>
+                {page.name}
+                <small>运行时页面预览</small>
+              </header>
+              <PageSurface
+                page={page}
+                model={model}
+                rows={app.records[model.id] || []}
+                add={() => notify('请进入运行预览填写并保存数据')}
+                remove={() => notify('设计预览中不删除数据，请在数据管理操作')}
+              />
+            </div>
+          </>
+        ) : (
+          <div className="studio-empty">
+            <LayoutTemplate />
+            <h3>创建并绑定页面</h3>
+            <p>页面必须绑定一个已有数据模型。</p>
+          </div>
+        )}
+      </article>
+    </div>
+  );
+}
+function RoleBuilder({
+  app,
+  change,
+}: {
+  app: App;
+  change: (x: App, m?: string) => void;
+}) {
+  const [name, setName] = useState('');
+  return (
+    <>
+      <div className="studio-title">
+        <div>
+          <h3>角色与操作权限</h3>
+          <p>权限将在运行预览中直接控制新增与删除按钮。</p>
+        </div>
+        <div className="inline-add">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="新角色名称"
+          />
+          <button
+            onClick={() => {
+              if (name) {
+                change(
+                  {
+                    ...app,
+                    roles: [
+                      ...app.roles,
+                      {
+                        id: id('role'),
+                        name,
+                        create: false,
+                        read: true,
+                        update: false,
+                        remove: false,
+                      },
+                    ],
+                  },
+                  '角色已创建',
+                );
+                setName('');
+              }
+            }}
+          >
+            <Plus size={13} />
+            添加角色
+          </button>
+        </div>
+      </div>
+      <div className="role-grid">
+        {app.roles.map((r) => (
+          <article key={r.id}>
+            <h4>
+              <KeyRound size={15} />
+              {r.name}
+            </h4>
+            {(['create', 'read', 'update', 'remove'] as const).map((k) => (
+              <label key={k}>
+                <input
+                  type="checkbox"
+                  checked={r[k]}
+                  onChange={(e) =>
+                    change({
+                      ...app,
+                      roles: app.roles.map((x) =>
+                        x.id === r.id ? { ...x, [k]: e.target.checked } : x,
+                      ),
+                    })
+                  }
+                />
+                {
+                  {
+                    create: '新增',
+                    read: '查看',
+                    update: '编辑',
+                    remove: '删除',
+                  }[k]
+                }
+              </label>
+            ))}
+          </article>
+        ))}
+      </div>
+    </>
+  );
+}
+function WorkflowBuilder({
+  app,
+  change,
+}: {
+  app: App;
+  change: (x: App, m?: string) => void;
+}) {
+  return (
+    <>
+      <h3>工作流</h3>
+      <div className="workflow-config">
+        <label>
+          <input
+            type="checkbox"
+            checked={app.workflow.enabled}
+            onChange={(e) =>
+              change(
+                {
+                  ...app,
+                  workflow: { ...app.workflow, enabled: e.target.checked },
+                },
+                e.target.checked ? '工作流已启用' : '工作流已停用',
+              )
+            }
+          />
+          启用自动流程
+        </label>
+        <select
+          value={app.workflow.trigger}
+          onChange={(e) =>
+            change({
+              ...app,
+              workflow: { ...app.workflow, trigger: e.target.value },
+            })
+          }
+        >
+          <option>记录创建</option>
+          <option>记录更新</option>
+          <option>定时触发</option>
+        </select>
+        <Workflow />
+        <span>触发后</span>
+        <select
+          value={app.workflow.action}
+          onChange={(e) =>
+            change({
+              ...app,
+              workflow: { ...app.workflow, action: e.target.value },
+            })
+          }
+        >
+          <option>站内通知</option>
+          <option>创建审批任务</option>
+          <option>调用 Webhook</option>
+        </select>
+      </div>
+    </>
+  );
+}
+function PluginSelector({
+  app,
+  change,
+}: {
+  app: App;
+  change: (x: App, m?: string) => void;
+}) {
+  const [q, setQ] = useState('');
+  const shown = assemblyPlugins.filter((x) =>
+    (x.name + x.description).includes(q),
+  );
+  const installed = (p: AssemblyPlugin) => app.plugins.includes(p.name);
+  const add = (p: AssemblyPlugin) => {
+    const names = new Set(app.plugins);
+    const visit = (x: AssemblyPlugin) => {
+      x.depends.forEach((d) => {
+        const dep = assemblyPlugins.find((y) => y.id === d);
+        if (dep) visit(dep);
+      });
+      names.add(x.name);
+    };
+    visit(p);
+    change({ ...app, plugins: Array.from(names) }, `${p.name}及依赖已装配`);
+  };
+  const remove = (p: AssemblyPlugin) => {
+    const dependents = assemblyPlugins.filter(
+      (x) => installed(x) && x.depends.includes(p.id),
+    );
+    if (dependents.length) return;
+    change(
+      { ...app, plugins: app.plugins.filter((x) => x !== p.name) },
+      `${p.name}已从项目移除`,
+    );
+  };
+  return (
+    <>
+      <div className="studio-title">
+        <div>
+          <h3>项目插件装配</h3>
+          <p>
+            已装配 {app.plugins.length}{' '}
+            项。这里仅显示已经具备项目贡献逻辑的插件。
+          </p>
+        </div>
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="搜索可装配插件"
+        />
+      </div>
+      <div className="plugin-select-grid assembly-edit">
+        {shown.map((p) => (
+          <label key={p.id}>
+            <input
+              type="checkbox"
+              checked={installed(p)}
+              onChange={(e) => (e.target.checked ? add(p) : remove(p))}
+            />
+            <span>
+              <b>{p.name}</b>
+              <small>{p.contributes.join(' · ')}</small>
+            </span>
+          </label>
+        ))}
+      </div>
+    </>
+  );
+}
+function Publish({
+  app,
+  change,
+  preview,
+  notify,
+}: {
+  app: App;
+  change: (x: App, m?: string) => void;
+  preview: () => void;
+  notify: (x: string) => void;
+}) {
+  const blockers = [
+    !app.models.length && '缺少数据模型',
+    !app.models.some((x) => x.fields.length) && '模型没有字段',
+    !app.pages.length && '缺少运行页面',
+  ].filter(Boolean);
+  return (
+    <div className="publish-real">
+      <ShieldCheck />
+      <h3>发布前真实检查</h3>
+      {blockers.length ? (
+        <>
+          {blockers.map((x) => (
+            <p key={String(x)}>未通过：{x}</p>
+          ))}
+          <button onClick={() => notify('请先处理所有未通过项')}>
+            当前不可发布
+          </button>
+        </>
+      ) : (
+        <>
+          <p>模型、字段、页面和权限结构已通过基础检查。</p>
+          <button onClick={preview}>
+            <Eye size={14} />
+            运行验证
+          </button>
+          <button
+            onClick={() =>
+              change(
+                { ...app, status: '已发布' },
+                '应用已发布并保留全部配置与数据',
+              )
+            }
+          >
+            确认发布
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+function Runtime({
+  app,
+  role: initialRole,
+  initialPage,
+  close,
+  change,
+  notify,
+}: {
+  app: App;
+  role: Role;
+  initialPage?: Page;
+  close: () => void;
+  change: (x: App, m?: string) => void;
+  notify: (x: string) => void;
+}) {
+  const [roleId, setRoleId] = useState(initialRole.id),
+    [pageId, setPageId] = useState(initialPage?.id || app.pages[0]?.id || ''),
+    [showForm, setShowForm] = useState(false),
+    [values, setValues] = useState<Record<string, unknown>>({});
+  const role = app.roles.find((x) => x.id === roleId) || initialRole,
+    page = app.pages.find((x) => x.id === pageId),
+    model = app.models.find((x) => x.id === page?.modelId),
+    rows = model ? app.records[model.id] || [] : [];
+  const save = () => {
+    if (!model) return;
+    const missing = model.fields.find(
+      (f) => f.required && !String(values[f.key] ?? '').trim(),
+    );
+    if (missing) return notify(`${missing.name}为必填字段`);
+    change(
+      {
+        ...app,
+        records: {
+          ...app.records,
+          [model.id]: [...rows, { id: id('row'), ...values }],
+        },
+      },
+      '运行页面已新增记录',
+    );
+    setValues({});
+    setShowForm(false);
+  };
+  return (
+    <div className="runtime">
+      <header>
+        <div>
+          <b>{app.name}</b>
+          <small>
+            {app.mode === 'ai' ? '人工智能模式' : '无代码模式'} ·{' '}
+            {app.plugins.length} 个插件已装配 · 数据会保存
+          </small>
+        </div>
+        <select value={roleId} onChange={(e) => setRoleId(e.target.value)}>
+          {app.roles.map((x) => (
+            <option value={x.id} key={x.id}>
+              {x.name}
+            </option>
+          ))}
+        </select>
+        <button onClick={close}>退出预览</button>
+      </header>
+      <div>
+        <aside>
+          {app.pages.map((x) => (
+            <button
+              className={x.id === pageId ? 'active' : ''}
+              onClick={() => setPageId(x.id)}
+              key={x.id}
+            >
+              {x.name}
+            </button>
+          ))}
+        </aside>
+        <main>
+          <div className="runtime-plugin-strip">
+            <span>已生效能力</span>
+            {app.plugins.slice(0, 6).map((name) => (
+              <b key={name}>{name}</b>
+            ))}
+            {app.plugins.length > 6 && <em>+{app.plugins.length - 6}</em>}
+          </div>
+          {page && model ? (
+            <>
+              <div className="runtime-title">
+                <div>
+                  <h2>{page.name}</h2>
+                  <p>
+                    模型：{model.name} · 角色：{role.name}
+                  </p>
+                </div>
+                {role.create && (
+                  <button onClick={() => setShowForm(true)}>
+                    <Plus size={14} />
+                    新增记录
+                  </button>
+                )}
+              </div>
+              {role.read ? (
+                <PageSurface
+                  page={page}
+                  model={model}
+                  rows={rows}
+                  add={role.create ? () => setShowForm(true) : undefined}
+                  remove={(rid) =>
+                    role.remove
+                      ? change(
+                          {
+                            ...app,
+                            records: {
+                              ...app.records,
+                              [model.id]: rows.filter((x) => x.id !== rid),
+                            },
+                          },
+                          '记录已删除',
+                        )
+                      : notify('当前角色没有删除权限')
+                  }
+                />
+              ) : (
+                <div className="studio-empty">当前角色没有查看权限。</div>
+              )}
+            </>
+          ) : (
+            <div className="studio-empty">页面未正确绑定模型。</div>
+          )}
+        </main>
+      </div>
+      {showForm && model && (
+        <div className="runtime-form">
+          <article>
+            <h3>新增{model.name}</h3>
+            {model.fields.map((f) => (
+              <label key={f.id}>
+                {f.name}
+                {f.required && '*'}
+                <input
+                  type={
+                    f.type === '数字'
+                      ? 'number'
+                      : f.type === '日期'
+                        ? 'date'
+                        : 'text'
+                  }
+                  value={String(values[f.key] ?? '')}
+                  onChange={(e) =>
+                    setValues({ ...values, [f.key]: e.target.value })
+                  }
+                />
+              </label>
+            ))}
+            <footer>
+              <button onClick={() => setShowForm(false)}>取消</button>
+              <button onClick={save}>保存记录</button>
+            </footer>
+          </article>
+        </div>
+      )}
+    </div>
+  );
+}
